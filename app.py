@@ -325,7 +325,7 @@ prompt = st.text_area("Your request", key="prompt", height=96, label_visibility=
                       placeholder="e.g. Three of us want something active outdoors this evening, under $30 each")
 
 status = config.api_status()
-missing = [name for name, ok in [("OpenAI", status["openai"]), ("Google Maps", status["google_maps"])] if not ok]
+missing = [name for name, ok in [("Claude", status["llm"]), ("Google Maps", status["google_maps"])] if not ok]
 if missing:
     st.warning(f"The app owner still needs to add API keys for: {', '.join(missing)}.")
 

@@ -152,7 +152,7 @@ def resources(monkeypatch):
         monkeypatch.setattr(f"{module}.call_llm_json", fake_llm)
     monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "test")
     monkeypatch.setenv("TICKETMASTER_API_KEY", "test")
-    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
     from recommender.weather import geocode_city
     geocode_city.cache_clear()
     return build_resources(FIXTURE, embedder=FakeEmbedder())

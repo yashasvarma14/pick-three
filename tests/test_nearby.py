@@ -80,7 +80,7 @@ def resources(monkeypatch):
     for module in ["recommender.preference", "recommender.relevance", "recommender.rag",
                    "recommender.orchestrator", "recommender.synthesizer", "recommender.memory"]:
         monkeypatch.setattr(f"{module}.call_llm_json", nearby_llm)
-    for name in ["GOOGLE_MAPS_API_KEY", "TICKETMASTER_API_KEY", "OPENAI_API_KEY"]:
+    for name in ["GOOGLE_MAPS_API_KEY", "TICKETMASTER_API_KEY", "ANTHROPIC_API_KEY"]:
         monkeypatch.setenv(name, "test")
     return build_resources(FIXTURE, embedder=FakeEmbedder())
 

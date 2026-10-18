@@ -24,8 +24,8 @@ def get_setting(name, default=None):
     return value if value not in (None, "") else default
 
 
-def openai_api_key():
-    return get_setting("OPENAI_API_KEY")
+def anthropic_api_key():
+    return get_setting("ANTHROPIC_API_KEY")
 
 
 def google_maps_api_key():
@@ -37,12 +37,18 @@ def ticketmaster_api_key():
 
 
 def llm_model():
-    return get_setting("OPENAI_MODEL", "gpt-6-luna")
+    return get_setting("LLM_MODEL", "claude-haiku-5-5")
+
+
+def llm_effort():
+    """low | medium | high | xhigh | max. Low suits these short JSON tasks."""
+    return get_setting("LLM_EFFORT", "low")
 
 
 def model_pricing():
     """USD per 1M tokens. Check these against your provider's current pricing."""
     return {
+        # Claude Haiku 5.5 list prices (prompts up to 100K tokens).
         "input_per_1m": float(get_setting("MODEL_INPUT_PRICE_PER_1M", 0.10)),
         "output_per_1m": float(get_setting("MODEL_OUTPUT_PRICE_PER_1M", 0.50)),
     }
@@ -51,7 +57,7 @@ def model_pricing():
 def api_status():
     """Which external services are configured right now."""
     return {
-        "openai": bool(openai_api_key()),
+        "llm": bool(anthropic_api_key()),
         "google_maps": bool(google_maps_api_key()),
         "ticketmaster": bool(ticketmaster_api_key()),
         "weather": True,  # Open-Meteo needs no key

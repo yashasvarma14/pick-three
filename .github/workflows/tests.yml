@@ -9,5 +9,5 @@ jobs:
         with:
           python-version: "3.12"
       # The tests fake the embedding model, so PyTorch isn't needed here.
-      - run: pip install pandas numpy requests beautifulsoup4 openai streamlit pytest
+      - run: pip install pandas numpy requests beautifulsoup4 anthropic streamlit pytest
       - run: python -m pytest -q

@@ -83,11 +83,11 @@ Upload this repo as `activity-recommender.zip` to the project's Google Drive fol
 
 | Key | Needed for | Notes |
 |---|---|---|
-| `OPENAI_API_KEY` | Every LLM step | Required |
+| `ANTHROPIC_API_KEY` | Every LLM step (Claude Haiku 5.5 by default, set `LLM_MODEL` to change) | Required; create it at platform.claude.com (API billing is separate from a Claude subscription) |
 | `GOOGLE_MAPS_API_KEY` | Venues and drive times | Enable **Places API (New)** and **Routes API** |
 | `TICKETMASTER_API_KEY` | Live events | Optional; the Events agent is skipped without it |
 
-Weather uses Open-Meteo, which needs no key. The Photo Vibe agent uses the same Google key (Places API (New) photos) and needs a vision-capable `OPENAI_MODEL`; set `photo_vibe` to `"off"` in `recommender/config.py` to turn it off.
+Weather uses Open-Meteo, which needs no key. The Photo Vibe agent uses the same Google key (Places API (New) photos) and needs a vision-capable `LLM_MODEL` (every current Claude model is); set `photo_vibe` to `"off"` in `recommender/config.py` to turn it off.
 
 ## Deploy your own copy (Streamlit Community Cloud)
 
@@ -100,7 +100,7 @@ Weather uses Open-Meteo, which needs no key. The Photo Vibe agent uses the same 
 
 Every search calls paid APIs, so the app limits searches per visitor (`RUNS_PER_SESSION`) and per day (`RUNS_PER_DAY`). Also set limits on the provider side:
 
-- **OpenAI:** set a monthly budget and usage limit in your organization's billing settings.
+- **Anthropic:** set a monthly spend limit in the Claude Console's billing / limits settings.
 - **Google Cloud:** restrict the key to Places API (New) and Routes API, and set per-day request quotas for each. Each photo the Photo Vibe agent downloads is a billed Place Photo request (up to 3 photos x 5 venues per search, only when the planner thinks the look matters).
 
 Visitor memory is kept in the browser session only, so visitors never see or change each other's preferences.

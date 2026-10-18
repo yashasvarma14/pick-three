@@ -1,6 +1,6 @@
 """
-One place for every LLM call: client creation, JSON parsing,
-and token/cost accounting. The notebook repeated this block in
+One place for every LLM call (Claude, via the Anthropic SDK): client
+creation, JSON parsing, and token/cost accounting. The notebook repeated this block in
 every agent; here each agent calls `call_llm_json`.
 """
 
@@ -17,12 +17,12 @@ _client = None
 def get_client():
     global _client
     if _client is None:
-        from openai import OpenAI
+        import anthropic
 
-        key = config.openai_api_key()
+        key = config.anthropic_api_key()
         if not key:
-            raise RuntimeError("OPENAI_API_KEY is not configured.")
-        _client = OpenAI(api_key=key)
+            raise RuntimeError("ANTHROPIC_API_KEY is not configured.")
+        _client = anthropic.Anthropic(api_key=key)
     return _client
 
 
@@ -51,32 +51,31 @@ _local = threading.local()
 @ttl_cache(seconds=15 * 60, maxsize=256)
 def _cached_call(system_prompt, user_message, model, image_urls=()):
     _local.made_request = True
-    kwargs = {}
-    effort = config.get_setting("OPENAI_REASONING_EFFORT")
-    if effort:
-        # Optional speed knob for reasoning models ("low" or "minimal").
-        kwargs["reasoning"] = {"effort": str(effort)}
-
     content = user_message
     if image_urls:
-        # "low" detail: one small tile per photo, enough to judge the look of
-        # a room and a fraction of the tokens of full resolution.
-        content = [{"type": "input_text", "text": user_message}] + [
-            {"type": "input_image", "image_url": url, "detail": "low"} for url in image_urls]
-    response = get_client().responses.create(
+        # Photos first, then the question about them. Google serves them at
+        # 640 px wide, a few hundred input tokens each.
+        content = [{"type": "image", "source": {"type": "url", "url": url}} for url in image_urls] + [
+            {"type": "text", "text": user_message}]
+    response = get_client().messages.create(
         model=model,
-        input=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": content},
-        ],
-        **kwargs,
+        max_tokens=16000,
+        system=system_prompt,
+        messages=[{"role": "user", "content": content}],
+        # Every agent asks a short, well-specified question: low effort keeps
+        # thinking (and latency) small. Raise LLM_EFFORT if answers get sloppy.
+        output_config={"effort": str(config.llm_effort())},
     )
-    usage_obj = getattr(response, "usage", None)
-    input_tokens = getattr(usage_obj, "input_tokens", 0) or 0
-    output_tokens = getattr(usage_obj, "output_tokens", 0) or 0
-    total_tokens = getattr(usage_obj, "total_tokens", 0) or (input_tokens + output_tokens)
+    if response.stop_reason == "refusal":
+        raise RuntimeError("The model declined this request.")
+    if response.stop_reason == "max_tokens":
+        raise RuntimeError("The model's answer was cut off (max_tokens).")
+    usage = response.usage
+    input_tokens = (usage.input_tokens or 0) + (getattr(usage, "cache_read_input_tokens", 0) or 0)
+    output_tokens = usage.output_tokens or 0
+    text = "".join(block.text for block in response.content if block.type == "text")
     # Parse inside the cached function so a bad answer is never cached.
-    return parse_json_text(response.output_text), (input_tokens, output_tokens, total_tokens)
+    return parse_json_text(text), (input_tokens, output_tokens, input_tokens + output_tokens)
 
 
 def call_llm_json(system_prompt, user_message, model=None, image_urls=None):
