@@ -75,6 +75,8 @@ def _row(place, phrase, origin_lat, origin_lng):
         "website_uri": place.get("websiteUri"),
         "weekday_descriptions": hours.get("weekdayDescriptions", []),
         "opening_periods": hours.get("periods", []),
+        # Photo references only (no download, no cost); the website shows them through /api/photo.
+        "photo_names": [p["name"] for p in (place.get("photos") or [])[:3] if p.get("name")],
         "source_activity": phrase,
         "matched_searches": [phrase],
     }

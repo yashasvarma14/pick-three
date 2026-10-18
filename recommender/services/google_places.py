@@ -23,7 +23,7 @@ SEARCH_FIELDS = ",".join([
     "places.id", "places.displayName", "places.formattedAddress", "places.location",
     "places.rating", "places.userRatingCount", "places.priceLevel", "places.types",
     "places.primaryType", "places.primaryTypeDisplayName", "places.businessStatus",
-    "places.googleMapsUri", "places.websiteUri", "places.regularOpeningHours", "nextPageToken",
+    "places.googleMapsUri", "places.websiteUri", "places.regularOpeningHours", "places.photos", "nextPageToken",
 ])
 
 

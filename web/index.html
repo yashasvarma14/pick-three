@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tonight, Sorted</title>
+  <meta name="description" content="Describe your plan in plain English. AI agents check real places, live traffic, reviews and photos, then pick three.">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23111'/><circle cx='22' cy='10' r='4' fill='%23FF5A36'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-view="home">
+
+  <!-- ===================== Header ===================== -->
+  <header class="topbar" id="topbar">
+    <a class="brand" href="#" data-action="home" aria-label="Tonight, Sorted home">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Tonight, Sorted</span>
+    </a>
+    <nav class="topnav">
+      <a href="#how" data-action="how">How it works</a>
+      <button class="memory-btn" id="memory-btn" type="button" aria-haspopup="dialog" aria-controls="memory-panel">
+        <span class="memory-dot" id="memory-dot" hidden></span>What I remember
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===================== Hero + search ===================== -->
+    <section class="hero" id="hero">
+      <p class="eyebrow reveal-word"><span class="live-dot" aria-hidden="true"></span> Live in Austin</p>
+      <h1 class="hero-title" id="hero-title">What should we do <em>tonight</em>?</h1>
+      <p class="hero-sub" id="hero-sub">Say the plan in your own words. A team of AI agents checks real places, live traffic,
+        reviews and photos, then picks three.</p>
+
+      <form class="composer" id="composer" autocomplete="off">
+        <label class="visually-hidden" for="prompt">Describe your plan</label>
+        <textarea id="prompt" name="prompt" rows="1" maxlength="500" required></textarea>
+        <div class="composer-placeholder" id="placeholder" aria-hidden="true"></div>
+
+        <div class="composer-bar">
+          <div class="chips">
+            <!-- Where -->
+            <div class="chip-wrap">
+              <button type="button" class="chip" id="where-chip" aria-haspopup="dialog" aria-expanded="false">
+                <svg class="i"><use href="#i-pin"/></svg><span id="where-label">Near UT Austin</span>
+              </button>
+              <div class="popover" id="where-pop" role="dialog" aria-label="Where are you?" hidden>
+                <p class="pop-title">Where are you?</p>
+                <button type="button" class="pop-action" id="use-gps"><svg class="i"><use href="#i-locate"/></svg>Use my current location</button>
+                <div class="pop-divider"><span>or</span></div>
+                <input type="text" id="where-input" placeholder="Address, neighborhood or ZIP" value="University of Texas at Austin">
+                <p class="pop-hint" id="where-hint">Searches and drive times start here.</p>
+                <button type="button" class="pop-done" id="where-done">Done</button>
+              </div>
+            </div>
+            <!-- When -->
+            <div class="chip-wrap">
+              <button type="button" class="chip" id="when-chip" aria-haspopup="dialog" aria-expanded="false">
+                <svg class="i"><use href="#i-clock"/></svg><span id="when-label">Tonight, 7 PM</span>
+              </button>
+              <div class="popover" id="when-pop" role="dialog" aria-label="When?" hidden>
+                <p class="pop-title">When?</p>
+                <div class="segmented" id="when-seg" role="radiogroup">
+                  <button type="button" role="radio" data-when="now">Now</button>
+                  <button type="button" role="radio" data-when="tonight" aria-checked="true">Tonight</button>
+                  <button type="button" role="radio" data-when="tomorrow">Tomorrow</button>
+                  <button type="button" role="radio" data-when="pick">Pick</button>
+                  <span class="seg-glider" aria-hidden="true"></span>
+                </div>
+                <input type="datetime-local" id="when-input" hidden>
+                <p class="pop-hint">A time in your request ("this afternoon") wins over this.</p>
+                <button type="button" class="pop-done" id="when-done">Done</button>
+              </div>
+            </div>
+            <!-- Drive -->
+            <div class="chip-wrap">
+              <button type="button" class="chip" id="drive-chip" aria-haspopup="dialog" aria-expanded="false">
+                <svg class="i"><use href="#i-car"/></svg><span id="drive-label">20 min drive</span>
+              </button>
+              <div class="popover" id="drive-pop" role="dialog" aria-label="Longest drive" hidden>
+                <p class="pop-title">Longest drive you'd accept</p>
+                <div class="segmented" id="drive-seg" role="radiogroup">
+                  <button type="button" role="radio" data-drive="10">10 min</button>
+                  <button type="button" role="radio" data-drive="20" aria-checked="true">20</button>
+                  <button type="button" role="radio" data-drive="30">30</button>
+                  <button type="button" role="radio" data-drive="45">45</button>
+                  <span class="seg-glider" aria-hidden="true"></span>
+                </div>
+                <label class="toggle"><input type="checkbox" id="deep"> <span>Search deeper</span>
+                  <small>up to 60 places per search, slower</small></label>
+                <button type="button" class="pop-done" id="drive-done">Done</button>
+              </div>
+            </div>
+          </div>
+          <button class="go" id="go" type="submit" disabled>
+            <span>Find options</span><svg class="i"><use href="#i-arrow"/></svg>
+          </button>
+        </div>
+      </form>
+
+      <div class="examples" id="examples" aria-label="Example requests"></div>
+      <p class="status-line" id="status-line" role="status"></p>
+    </section>
+
+    <!-- ===================== Search progress ===================== -->
+    <section class="progress" id="progress" hidden aria-live="polite">
+      <div class="progress-head">
+        <p class="progress-title"><span class="spinner" aria-hidden="true"></span><span id="progress-title">Working on it</span></p>
+        <p class="progress-time" id="progress-time">0.0s</p>
+      </div>
+      <div class="progress-bar"><span id="progress-fill"></span></div>
+      <ol class="steps" id="steps"></ol>
+    </section>
+
+    <!-- ===================== Results ===================== -->
+    <section class="results" id="results" hidden>
+      <div class="results-head">
+        <div>
+          <p class="results-kicker" id="results-kicker"></p>
+          <h2 class="results-title" id="results-title"></h2>
+        </div>
+        <button class="ghost-btn" type="button" data-action="home">New search</button>
+      </div>
+      <div class="notes" id="notes"></div>
+
+      <div class="results-grid">
+        <div class="picks" id="picks"></div>
+        <aside class="map-col">
+          <div class="map" id="map" role="region" aria-label="Map of places found"></div>
+          <p class="map-legend"><span class="dot dot-you"></span>You <span class="dot dot-pick"></span>Top picks
+            <span class="dot dot-other"></span>Everything else found</p>
+        </aside>
+      </div>
+
+      <div class="feedback" id="feedback">
+        <div class="feedback-row">
+          <p><strong>Were these helpful?</strong> Tell me what to change and I'll remember it next time.</p>
+          <div class="thumbs">
+            <button type="button" class="thumb" data-vote="up" aria-label="Helpful">👍</button>
+            <button type="button" class="thumb" data-vote="down" aria-label="Not helpful">👎</button>
+          </div>
+        </div>
+        <form class="feedback-form" id="feedback-form">
+          <input type="text" id="feedback-text" maxlength="500"
+                 placeholder="e.g. Not another bar. Something active, and nothing over 15 minutes away.">
+          <button type="submit" class="ghost-btn">Save</button>
+        </form>
+      </div>
+
+      <details class="panel" id="all-panel">
+        <summary><span id="all-count">All places</span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+        <div class="panel-body">
+          <div class="list-tools">
+            <label class="toggle small"><input type="checkbox" id="only-open"> <span>Only open at my time</span></label>
+            <p class="muted" id="all-searches"></p>
+          </div>
+          <div class="place-list" id="place-list"></div>
+        </div>
+      </details>
+
+      <details class="panel" id="events-panel" hidden>
+        <summary><span id="events-count">Live events nearby</span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+        <div class="panel-body"><div class="place-list" id="event-list"></div></div>
+      </details>
+
+      <details class="panel" id="trace-panel">
+        <summary><span>How the agents decided</span><svg class="i chev"><use href="#i-chev"/></svg></summary>
+        <div class="panel-body" id="trace"></div>
+      </details>
+    </section>
+
+    <!-- ===================== Austin's top 10 ===================== -->
+    <section class="featured" id="featured">
+      <div class="section-head reveal">
+        <h2>Austin's top 10</h2>
+        <p class="muted">Before you search: the best-reviewed spots in town, ranked by rating <em>and</em> how many people agree.</p>
+      </div>
+      <div class="tabs reveal" id="tabs" role="tablist" aria-label="Categories">
+        <span class="tab-glider" aria-hidden="true"></span>
+      </div>
+      <div class="rail-wrap reveal">
+        <button class="rail-btn prev" type="button" aria-label="Scroll left"><svg class="i"><use href="#i-chev-left"/></svg></button>
+        <div class="rail" id="rail" tabindex="0" aria-label="Top 10 list"></div>
+        <button class="rail-btn next" type="button" aria-label="Scroll right"><svg class="i"><use href="#i-chev-right"/></svg></button>
+      </div>
+    </section>
+
+    <!-- ===================== How it works ===================== -->
+    <section class="how" id="how">
+      <div class="section-head reveal">
+        <h2>How it works</h2>
+        <p class="muted">Not one chatbot guess: thirteen small agents, each checking one thing, most of them at the same time.</p>
+      </div>
+      <ol class="how-grid">
+        <li class="how-card reveal"><span class="how-num">01</span><h3>Plan</h3>
+          <p>A planner reads your request and decides which specialists are worth calling: weather, events, photos.</p></li>
+        <li class="how-card reveal"><span class="how-num">02</span><h3>Search</h3>
+          <p>Several Google Maps searches run around you at once, boxed to how far you're willing to drive.</p></li>
+        <li class="how-card reveal"><span class="how-num">03</span><h3>Check</h3>
+          <p>The best candidates get a closer look: does it really fit, is it open, live traffic, reviews, and how it looks in photos.</p></li>
+        <li class="how-card reveal"><span class="how-num">04</span><h3>Pick</h3>
+          <p>Plain math ranks the finalists and an LLM explains the top three, without being allowed to change the order.</p></li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Tonight, Sorted · built by Yashas Varma · places &amp; photos from Google Maps, weather from Open-Meteo</p>
+  </footer>
+
+  <!-- ===================== Memory panel ===================== -->
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+  <aside class="sheet" id="memory-panel" role="dialog" aria-modal="true" aria-labelledby="memory-title" hidden>
+    <div class="sheet-head">
+      <h2 id="memory-title">What I remember</h2>
+      <button type="button" class="icon-btn" id="memory-close" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button>
+    </div>
+    <p class="muted">Only in this browser. Your feedback after a search lands here and shapes the next one.</p>
+    <div id="memory-body"></div>
+    <label class="toggle"><input type="checkbox" id="use-memory" checked> <span>Use this when I search</span></label>
+    <button type="button" class="ghost-btn danger" id="memory-forget">Forget everything</button>
+  </aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- ===================== Icons ===================== -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+      <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="i-car" viewBox="0 0 24 24"><path d="M5 16h14M6.5 16l1-5.5a2 2 0 0 1 2-1.5h5a2 2 0 0 1 2 1.5l1 5.5M5 16v2.5M19 16v2.5"/><circle cx="8" cy="16" r=".5"/><circle cx="16" cy="16" r=".5"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+      <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+      <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></symbol>
+    </defs>
+  </svg>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
