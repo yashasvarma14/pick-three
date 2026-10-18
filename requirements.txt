@@ -1,0 +1,11 @@
+# CPU-only PyTorch keeps the install small enough for Streamlit Community Cloud.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+sentence-transformers>=3.0
+streamlit>=1.50
+streamlit-js-eval==1.0.0
+openai>=1.40
+pandas>=2.0
+numpy
+requests
+beautifulsoup4

@@ -1,0 +1,197 @@
+activity,type,participants,price
+Meditate for five minutes,relaxation,1,0.0
+Uninstall unused apps from your devices,busywork,1,0.0
+Learn to greet someone in a new language,education,1,0.1
+Go on a long drive with no music,relaxation,1,0.1
+Sit in the dark and listen to your favorite music with no distractions,relaxation,1,0.0
+Organize your movie collection,busywork,1,0.0
+Learn a new recipe,cooking,1,0.0
+Visit a nearby museum,recreational,1,0.2
+Make a new friend,social,1,0.0
+Learn the periodic table,education,1,0.0
+Pot some plants and put them around your house,relaxation,1,0.4
+Learn how to play a new sport,recreational,1,0.1
+Start a band,music,4,0.30000000000000004
+Start a collection,recreational,1,0.0
+Create and follow a savings plan,busywork,1,0.0
+Play a game of tennis with a friend,social,2,0.1
+Make homemade ice cream,cooking,1,0.2
+Take your cat on a walk,relaxation,1,0.02
+Have a picnic with some friends,social,3,0.1
+Research a topic you're interested in,education,1,0.0
+Mow your lawn,busywork,1,0.1
+Prepare a dish from a foreign culture,cooking,1,0.2
+Create or update your resume,busywork,1,0.0
+Watch a movie you'd never usually watch,relaxation,1,0.15
+Listen to a new podcast,relaxation,1,0.05
+Configure two-factor authentication on your accounts,busywork,1,0.0
+Contribute code or a monetary donation to an open-source software project,charity,1,0.1
+Hold a video game tournament with some friends,social,4,0.0
+Learn and play a new card game,recreational,1,0.0
+Learn Kotlin,education,1,0.0
+Write a song,music,1,0.0
+Catch up on world news,recreational,1,0.05
+Invite some friends over for a game night,social,4,0.0
+Learn how the internet works,education,1,0.0
+Learn Express.js,education,1,0.1
+Go for a walk,relaxation,1,0.0
+Bake pastries for you and your neighbor,cooking,1,0.4
+Plan a vacation you've always wanted to take,relaxation,1,0.0
+Play a game of Monopoly,social,4,0.2
+Back up important computer files,busywork,1,0.2
+Make a couch fort,recreational,1,0.0
+Start a family tree,social,1,0.0
+Make a simple musical instrument,music,1,0.4
+Draw and color a Mandala,relaxation,1,0.05
+Clean out your closet and donate the clothes you've outgrown,charity,1,0.0
+Learn Javascript,education,1,0.0
+Volunteer and help out at a senior center,charity,1,0.0
+Go to a music festival with some friends,social,4,0.4
+Organize your dresser,busywork,1,0.0
+Visit your past teachers,social,1,0.0
+Write a note of appreciation to someone,social,1,0.0
+Have a football scrimmage with some friends,social,8,0.0
+Give your pet ten minutes of focused attention,relaxation,1,0.0
+Go to a karaoke bar with some friends,social,4,0.5
+Plant a tree,recreational,1,0.30000000000000004
+Make a bucket list,busywork,1,0.0
+Prepare a 72-hour kit,busywork,1,0.5
+Read a formal research paper on an interesting subject,education,1,0.0
+Organize your basement,busywork,1,0.0
+Organize your pantry,busywork,1,0.0
+Organize a cluttered drawer,busywork,1,0.0
+Make a to-do list for your week,busywork,1,0.0
+Learn to sew on a button,education,1,0.05
+Have a photo session with some friends,social,4,0.05
+Look at your finances and find one way to save money,busywork,1,0.0
+Find a charity and donate to it,charity,1,0.4
+Match your storage containers with their lids,busywork,1,0.0
+Shred old documents you don't need anymore,busywork,1,0.0
+Mow your neighbor's lawn,charity,1,0.0
+Improve your touch typing,busywork,1,0.0
+Rearrange and organize your room,busywork,1,0.0
+Volunteer at a local animal shelter,charity,1,0.1
+Learn how to beatbox,recreational,1,0.0
+Start a webinar on a topic of your choice,education,1,0.0
+Learn how to fold a paper crane,education,1,0.1
+Fix something that's broken in your house,diy,1,0.1
+Practice coding in your favorite lanaguage,recreational,1,0.0
+Explore the nightlife of your city,social,1,0.1
+Think of a new business idea,recreational,1,0.0
+Bake a pie with some friends,cooking,3,0.30000000000000004
+Go to the gym,recreational,1,0.2
+Take a hike at a local park,recreational,1,0.0
+Catch up with a friend over a lunch date,social,2,0.2
+Start a garden,recreational,1,0.30000000000000004
+Cook something together with someone,cooking,2,0.30000000000000004
+Paint the first thing you see,recreational,1,0.25
+Learn about a distributed version control system such as Git,education,1,0.0
+Go on a fishing trip with some friends,social,3,0.4
+Hold a yard sale,social,1,0.0
+Learn origami,education,1,0.2
+Go see a Broadway production,recreational,4,0.8
+Clean out your car,busywork,1,0.0
+Surprise your significant other with something considerate,social,1,0.0
+Watch the sunset or the sunrise,recreational,1,0.0
+Go to a concert with some friends,social,4,0.6000000000000001
+Learn how to make a website,education,1,0.1
+Resolve a problem you've been putting off,busywork,1,0.0
+Draw something interesting,recreational,1,0.0
+Go swimming with a friend,social,2,0.1
+Look at pictures and videos of cute animals,relaxation,1,0.0
+Learn the NATO phonetic alphabet,education,1,0.0
+Patronize a local independent restaurant,recreational,1,0.2
+Take a class at your local community center that interests you,education,1,0.0
+Play a volleyball match with some friends,social,4,0.0
+Shop at support your local farmers market,relaxation,1,0.2
+Create a compost pile,diy,1,0.0
+Do a jigsaw puzzle,recreational,1,0.1
+Bake something you've never tried before,cooking,1,0.4
+Write a poem,recreational,1,0.0
+Go to the library and find an interesting book,relaxation,1,0.05
+Play basketball with a group of friends,social,5,0.0
+Make a scrapbook with pictures of your favorite memories,diy,1,0.1
+Clean out your refrigerator,busywork,1,0.0
+Go see a movie in theaters with a few friends,social,4,0.2
+Find a DIY to do,diy,1,0.4
+Make your own LEGO creation,recreational,1,0.0
+Start a book you've never gotten around to reading,relaxation,1,0.1
+Learn how to whistle with your fingers,education,1,0.0
+Learn the Chinese erhu,music,1,0.6000000000000001
+Volunteer at your local food pantry,charity,1,0.0
+Host a movie marathon with some friends,social,3,0.1
+Learn how to iceskate or rollerskate,recreational,1,0.1
+Do something you used to do as a kid,relaxation,1,0.1
+Go to a local thrift shop,recreational,1,0.1
+Write a list of things you are grateful for,relaxation,1,0.0
+Write a thank you letter to an influential person in your life,social,1,0.0
+Learn how to use a french press,recreational,1,0.30000000000000004
+Learn woodworking,diy,1,0.30000000000000004
+Listen to your favorite album,music,1,0.08
+Go for a run,recreational,1,0.0
+Watch a classic movie,recreational,1,0.1
+Create a meal plan for the coming week,cooking,1,0.0
+Learn how to make an Alexa skill,education,1,0.0
+Buy a new house decoration,recreational,1,0.4
+Learn how to use an Arduino,education,1,0.1
+Start a blog for something you're passionate about,recreational,1,0.05
+Color,relaxation,1,0.1
+Take a caffeine nap,relaxation,1,0.1
+Do something nice for someone you care about,social,1,0.0
+Have a jam session with your friends,music,5,0.1
+Organize a bookshelf,busywork,1,0.0
+Create a cookbook with your favorite recipes,cooking,1,0.0
+Take a spontaneous road trip with some friends,social,4,0.2
+Learn Morse code,education,1,0.0
+Listen to music you haven't heard in a while,music,1,0.05
+Make a budget,busywork,1,0.0
+Make bread from scratch,cooking,1,0.2
+Plan a trip to another country,recreational,1,0.0
+Watch a Khan Academy lecture on a subject of your choosing,education,1,0.0
+Go to a nail salon,relaxation,1,0.4
+Solve a Rubik's cube,recreational,1,0.0
+Learn to write with your nondominant hand,recreational,1,0.0
+Draft your living will,busywork,1,0.0
+Donate to your local food bank,charity,1,0.5
+Create a personal website,recreational,1,0.1
+Go to an escape room,social,4,0.5
+Explore a park you have never been to before,recreational,1,0.0
+Binge watch a trending series,recreational,1,0.2
+Play a video game,recreational,1,0.0
+Take a nap,relaxation,1,0.0
+Write a short story,recreational,1,0.0
+Learn GraphQL,education,1,0.0
+Do yoga,recreational,1,0.0
+Learn a new programming language,education,1,0.1
+Go stargazing,relaxation,1,0.0
+Teach your dog a new trick,relaxation,1,0.05
+Study a foreign language,education,1,0.0
+Compliment someone,social,2,0.0
+Wash your car,busywork,1,0.05
+Start a daily journal,relaxation,1,0.0
+Donate blood at a local blood center,charity,1,0.0
+Organize your music collection,busywork,1,0.0
+Take your dog on a walk,relaxation,1,0.0
+Learn how to write in shorthand,education,1,0.0
+Clean out your garage,busywork,1,0.0
+Volunteer at your local food bank,charity,1,0.0
+Learn to play a new instrument,music,1,0.55
+Learn about the Golden Ratio,education,1,0.1
+Pull a harmless prank on one of your friends,social,1,0.1
+Learn how to french braid hair,education,1,0.0
+Learn calligraphy,education,1,0.1
+Memorize the fifty states and their capitals,education,1,0.0
+Take a bubble bath,relaxation,1,0.15
+Memorize a favorite quote or poem,education,1,0.0
+Have a paper airplane contest with some friends,social,4,0.02
+Make tie dye shirts,diy,1,0.2
+Go to a concert with local artists with some friends,social,3,0.4
+Write a handwritten letter to somebody,social,1,0.1
+Try a food you don't like,recreational,1,0.1
+Repaint a room in your house,recreational,1,0.30000000000000004
+Have a bonfire with your close friends,social,4,0.1
+Fill out a basketball bracket,recreational,1,0.0
+Text a friend you haven't talked to in a long time,social,2,0.05
+Conquer one of your fears,recreational,1,0.1
+Listen to a new music genre,music,1,0.0
+Pick up litter around your favorite park,charity,1,0.0
