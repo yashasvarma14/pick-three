@@ -1,6 +1,6 @@
 """
 Live tracker: logs every search and every piece of feedback to a Google
-Sheet, so the team can see what people actually ask for and how the app
+Sheet, so you can see what people actually ask for and how the app
 performs (a real version of the planning "Agentic_Recommender_Tracker").
 
 How it works

@@ -15,7 +15,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from .base import failed, make_agent_response, skipped, ttl_cache
-from .llm import call_llm_json
+from .llm import call_llm_json, merge_usage, run_concurrently
 
 USER_AGENT = "Mozilla/5.0 (compatible; MSBA-Academic-RAG-Project/1.0)"
 
@@ -179,17 +179,27 @@ def venue_rag_agent(embedder, places_df, user_query, max_places=5, top_k_chunks=
         retrieved = retrieve_venue_evidence(embedder, evidence_df, user_query, top_k=top_k_chunks)
         venues = retrieved[["place_id", "place_name"]].drop_duplicates("place_id")
 
-        expected = "\n".join(f"- place_id: {r.place_id} | name: {r.place_name}" for r in venues.itertuples())
-        blocks = "\n".join(
-            f"\nEVIDENCE {i + 1}\nplace_id: {r.place_id}\nPlace Name: {r.place_name}\n"
-            f"Source URL: {r.website_uri}\nRetrieval Similarity: {r.rag_similarity:.4f}\nEvidence:\n{r.evidence_text}\n"
-            for i, r in enumerate(retrieved.itertuples())
-        )
-        message = f"USER REQUEST:\n{user_query}\n\nEXPECTED VENUES:\n{expected}\n\nRETRIEVED VENUE EVIDENCE:\n{blocks}"
+        def assess(venue):
+            # One call per venue, all at the same time: each answer is short,
+            # so the whole step takes about as long as a single venue.
+            chunks = retrieved[retrieved["place_id"] == venue.place_id]
+            blocks = "\n".join(
+                f"\nEVIDENCE {i + 1}\nplace_id: {r.place_id}\nPlace Name: {r.place_name}\n"
+                f"Source URL: {r.website_uri}\nRetrieval Similarity: {r.rag_similarity:.4f}\nEvidence:\n{r.evidence_text}\n"
+                for i, r in enumerate(chunks.itertuples())
+            )
+            message = (f"USER REQUEST:\n{user_query}\n\nEXPECTED VENUES:\n- place_id: {venue.place_id} | name: "
+                       f"{venue.place_name}\n\nRETRIEVED VENUE EVIDENCE:\n{blocks}")
+            return call_llm_json(SYSTEM_PROMPT, message)
 
-        parsed, usage = call_llm_json(SYSTEM_PROMPT, message)
+        outcomes = run_concurrently(assess, list(venues.itertuples()))
+        answered = [result for result, _ in outcomes if result is not None]
+        if not answered:
+            raise outcomes[0][1]
+        usage = merge_usage([u for _, u in answered])
         valid_ids = set(venues["place_id"])
-        assessments = [a for a in parsed.get("venue_assessments", []) if a.get("place_id") in valid_ids]
+        assessments = [a for parsed, _ in answered for a in parsed.get("venue_assessments", [])
+                       if a.get("place_id") in valid_ids]
         assessed = {a["place_id"] for a in assessments}
         missing = venues[~venues["place_id"].isin(assessed)]["place_name"].tolist()
 

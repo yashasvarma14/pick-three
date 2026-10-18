@@ -1,8 +1,8 @@
 """
 Matching Agent: final venue ranking.
 
-Default weights: 40% activity/context fit, 25% venue quality,
-15% mobility, 20% RAG evidence. Missing signals are left out and the
+Relative weights: 40 activity/context fit, 25 venue quality, 15 mobility,
+20 RAG evidence, 15 photo vibe. Missing signals are left out and the
 remaining weights are re-normalized; nothing is filled with a made-up value.
 """
 
@@ -19,10 +19,11 @@ def _valid(value):
     return value is not None and not pd.isna(value)
 
 
-def calculate_final_recommendation_score(activity_score, place_score, mobility_score, evidence_score=None, weights=None):
+def calculate_final_recommendation_score(activity_score, place_score, mobility_score, evidence_score=None,
+                                         weights=None, vibe_score=None):
     w = weights or MATCHING_WEIGHTS
     pairs = [(activity_score, w["activity"]), (place_score, w["place"]),
-             (mobility_score, w["mobility"]), (evidence_score, w["evidence"])]
+             (mobility_score, w["mobility"]), (evidence_score, w["evidence"]), (vibe_score, w.get("vibe", 0))]
     pairs = [(float(s), wt) for s, wt in pairs if _valid(s)]
     if not pairs:
         return None
@@ -31,7 +32,7 @@ def calculate_final_recommendation_score(activity_score, place_score, mobility_s
     return round(max(0.0, min(1.0, score)), 6)
 
 
-def matching_agent(candidates_df, venues_df, venue_assessments=None):
+def matching_agent(candidates_df, venues_df, venue_assessments=None, photo_assessments=None):
     start = time.time()
     venue_first = venues_df is not None and "venue_fit_score" in getattr(venues_df, "columns", [])
     if not venue_first and (candidates_df is None or candidates_df.empty):
@@ -73,9 +74,20 @@ def matching_agent(candidates_df, venues_df, venue_assessments=None):
             df["rag_strengths"] = df["place_id"].map(rag.get("supported_strengths", pd.Series(dtype=object)))
             df["rag_concerns"] = df["place_id"].map(rag.get("supported_concerns", pd.Series(dtype=object)))
 
+        df["photo_vibe_score"] = np.nan
+        for col in ["vibe_tags", "photo_summary", "visual_concerns", "photo_urls", "photo_attributions"]:
+            df[col] = None
+        if photo_assessments:
+            photos = pd.DataFrame(photo_assessments).drop_duplicates("place_id").set_index("place_id")
+            df["photo_vibe_score"] = pd.to_numeric(df["place_id"].map(photos["photo_vibe_score"]), errors="coerce")
+            for col in ["vibe_tags", "photo_summary", "visual_concerns", "photo_urls", "photo_attributions"]:
+                if col in photos.columns:
+                    df[col] = df["place_id"].map(photos[col])
+
         df["final_recommendation_score"] = df.apply(
             lambda r: calculate_final_recommendation_score(
-                r["activity_context_score"], r["place_quality_score"], r["mobility_score"], r["evidence_fit_score"]
+                r["activity_context_score"], r["place_quality_score"], r["mobility_score"], r["evidence_fit_score"],
+                vibe_score=r["photo_vibe_score"],
             ),
             axis=1,
         )
@@ -90,6 +102,7 @@ def matching_agent(candidates_df, venues_df, venue_assessments=None):
                 "activity_score_used": score_col,
                 "rag_places_used": int(df["evidence_fit_score"].notna().sum()),
                 "mobility_places_used": int(df["mobility_score"].notna().sum()),
+                "photo_places_used": int(df["photo_vibe_score"].notna().sum()),
                 "weights": MATCHING_WEIGHTS,
                 "runtime_seconds": time.time() - start,
             },

@@ -18,11 +18,12 @@ ORCHESTRATOR_AGENT_REGISTRY = {
     "events": {"purpose": "Retrieve scheduled concerts, sports, performances, festivals, and other live events.", "requires": ["preference"], "optional": True},
     "mobility": {"purpose": "Evaluate distance, travel time, and travel feasibility.", "requires": ["local_places"], "optional": True},
     "venue_rag": {"purpose": "Retrieve unstructured evidence from official venue websites.", "requires": ["local_places"], "optional": True},
+    "photo_vibe": {"purpose": "Look at venue photos to judge atmosphere and look (cozy, lively, romantic, scenic, kid-friendly).", "requires": ["local_places"], "optional": True},
     "matching": {"purpose": "Integrate activity, venue, mobility, and evidence signals into final rankings.", "requires": ["discovery", "local_places"], "optional": False},
 }
 
 CANONICAL_ORDER = ["memory", "preference", "discovery", "weather", "local_places",
-                   "events", "mobility", "venue_rag", "matching"]
+                   "events", "mobility", "venue_rag", "photo_vibe", "matching"]
 
 SYSTEM_PROMPT = """
 You are the Planner / Orchestrator for an agentic activity recommendation system.
@@ -43,14 +44,18 @@ GENERAL RULES:
    or venues should be checked for feasibility.
 7. Venue RAG should run when real venues exist and website evidence would
    improve the qualitative fit judgment.
-8. Matching should run once there are candidate activities and venues to rank.
-9. Do not request an agent only because it exists.
-10. Respect dependencies.
-11. Request a human clarification checkpoint only if proceeding would produce
+8. Photo Vibe should run when the look or atmosphere matters: date nights,
+   cozy / lively / quiet / romantic / aesthetic / scenic / upscale requests,
+   views, ambience, or "somewhere nice". Skip it for purely functional
+   requests (cheap food fast, a pharmacy, a gym) since every photo costs money.
+9. Matching should run once there are candidate activities and venues to rank.
+10. Do not request an agent only because it exists.
+11. Respect dependencies.
+12. Request a human clarification checkpoint only if proceeding would produce
     unreliable recommendations. Never ask about timing (the app supplies a
     date and time, and a time named in the request is handled automatically)
     or about location (the app supplies it).
-12. Prefer useful evidence over unnecessary calls, within the call limit.
+13. Prefer useful evidence over unnecessary calls, within the call limit.
 
 Every item in agents_to_run, agents_to_skip and execution_order MUST be a
 single plain string. Never return nested lists.
@@ -83,7 +88,7 @@ def _flatten(values):
     return out
 
 
-def validate_plan(plan, use_memory=True, max_agent_calls=9):
+def validate_plan(plan, use_memory=True, max_agent_calls=10):
     """Deterministic clean-up of whatever the LLM proposed."""
     valid = set(ORCHESTRATOR_AGENT_REGISTRY)
     agents = [a for a in dict.fromkeys(_flatten(plan.get("agents_to_run"))) if a in valid]
@@ -118,7 +123,7 @@ def validate_plan(plan, use_memory=True, max_agent_calls=9):
 
 
 def orchestrator_planner(user_prompt, memory_context="", city=None, origin=None,
-                         target_datetime=None, use_memory=True, max_agent_calls=9):
+                         target_datetime=None, use_memory=True, max_agent_calls=10):
     start = time.time()
     message = f"""
 CURRENT USER REQUEST:

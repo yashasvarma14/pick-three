@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .base import failed, make_agent_response, skipped
-from .llm import call_llm_json
+from .llm import call_llm_json, merge_usage, run_concurrently
 
 SYSTEM_PROMPT = """
 You are a venue relevance validator for an activity recommendation system.
@@ -44,7 +44,7 @@ Every input row must receive exactly one assessment. Keep reasons short.
 """
 
 
-def place_activity_relevance_agent(places_df, relevance_threshold=0.60, user_request=None):
+def place_activity_relevance_agent(places_df, relevance_threshold=0.60, user_request=None, batch_size=4):
     start = time.time()
     if places_df is None or places_df.empty:
         return skipped("place_relevance", "No candidate places to validate.")
@@ -73,8 +73,15 @@ def place_activity_relevance_agent(places_df, relevance_threshold=0.60, user_req
             request = " ".join(str(user_request).split())
             header = (f"USER REQUEST (score low if the place clearly doesn't suit it, e.g. wrong kind of "
                       f"place, a business office, a store when they want an activity): {request} | " + header)
-        parsed, usage = call_llm_json(SYSTEM_PROMPT, header + "\n" + json.dumps(records, indent=2))
-        assessments = pd.DataFrame(parsed.get("assessments", []))
+        # Small batches checked at the same time instead of one long call.
+        batches = [records[i:i + batch_size] for i in range(0, len(records), max(1, batch_size))]
+        outcomes = run_concurrently(
+            lambda batch: call_llm_json(SYSTEM_PROMPT, header + "\n" + json.dumps(batch, indent=2)), batches)
+        answered = [result for result, _ in outcomes if result is not None]
+        if not answered:
+            raise outcomes[0][1]
+        usage = merge_usage([u for _, u in answered])
+        assessments = pd.DataFrame([a for parsed, _ in answered for a in parsed.get("assessments", [])])
 
         if not assessments.empty and "row_id" in assessments.columns:
             # The model sometimes returns row_id as a string; a type mismatch
@@ -91,6 +98,14 @@ def place_activity_relevance_agent(places_df, relevance_threshold=0.60, user_req
             pd.to_numeric(df.get("place_activity_relevance_score"), errors="coerce").fillna(0.0).clip(0.0, 1.0)
         )
         df["place_activity_relevant"] = df["place_activity_relevance_score"] >= relevance_threshold
+        # A batch whose call failed was never judged: keep it unvalidated
+        # (as the workflow does when the whole check fails) rather than drop it.
+        unchecked = {r["row_id"] for (result, _), batch in zip(outcomes, batches) if result is None for r in batch}
+        if unchecked:
+            mask = df["row_id"].isin(unchecked)
+            df.loc[mask, "place_activity_relevant"] = True
+            df.loc[mask, "place_activity_relevance_score"] = relevance_threshold
+            df.loc[mask, "relevance_reason"] = "Not checked (the check for this batch failed)."
 
         filtered = df[df["place_activity_relevant"]].drop(columns=["row_id"]).reset_index(drop=True)
 
@@ -102,6 +117,8 @@ def place_activity_relevance_agent(places_df, relevance_threshold=0.60, user_req
                 "places_before_validation": len(df),
                 "places_after_validation": len(filtered),
                 "places_removed": len(df) - len(filtered),
+                "parallel_calls": len(batches),
+                "failed_calls": len(batches) - len(answered),
                 "runtime_seconds": time.time() - start,
             },
             sources=["Google Places structured metadata"],

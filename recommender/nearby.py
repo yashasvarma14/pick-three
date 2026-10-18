@@ -38,7 +38,10 @@ SEARCH_FIELDS = ",".join([
     "places.googleMapsUri", "places.websiteUri", "places.regularOpeningHours", "nextPageToken",
 ])
 
-DETAIL_FIELDS = "id,editorialSummary,reviews"
+# Place Details is billed at the tier of the priciest field asked for, and
+# reviews is already the top tier, so adding photo references costs nothing
+# extra; downloading a photo (photos.py) is billed separately.
+DETAIL_FIELDS = "id,editorialSummary,reviews,photos"
 
 # Average city driving speed used only to size the search area.
 KM_PER_DRIVE_MINUTE = 0.7
@@ -426,14 +429,17 @@ def place_details(place_id):
         if len(text) >= 40:
             reviews.append({"text": text, "rating": review.get("rating"),
                             "when": review.get("relativePublishTimeDescription")})
-    return {"editorial_summary": (data.get("editorialSummary") or {}).get("text"), "reviews": reviews}
+    photos = [{"name": p.get("name"), "width": p.get("widthPx"), "height": p.get("heightPx"),
+               "attributions": [a.get("displayName") for a in p.get("authorAttributions") or [] if a.get("displayName")]}
+              for p in data.get("photos") or [] if p.get("name")]
+    return {"editorial_summary": (data.get("editorialSummary") or {}).get("text"), "reviews": reviews, "photos": photos}
 
 
 def safe_place_details(place_id):
     try:
         return place_details(place_id)
     except Exception:
-        return {"editorial_summary": None, "reviews": []}
+        return {"editorial_summary": None, "reviews": [], "photos": []}
 
 
 

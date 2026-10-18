@@ -8,7 +8,7 @@ Planner + Preference (together)
   -> Score every place found (fit, quality, proximity, open, weather)
   -> Relevance check on the shortlist
   -> Drive times on the shortlist (+ Google reviews prefetched)
-  -> Venue RAG over reviews and websites
+  -> Venue RAG over reviews and websites  (+ Photo Vibe on Google photos)
   -> Matching -> grounded write-up
 
 Every place found stays in state["all_places"] so the app can show all of them.
@@ -32,6 +32,7 @@ from .places import distance_km
 from .nearby import (area_search_agent, resolve_location, diverse_selection, remove_duplicate_listings, safe_place_details,
                      score_places, search_radius_km)
 from .orchestrator import orchestrator_planner
+from .photos import photo_vibe_agent
 from .preference import preference_agent
 from .rag import prefetch_websites, venue_rag_agent
 from .relevance import place_activity_relevance_agent
@@ -367,6 +368,15 @@ def run_nearby_workflow(
     matching_input["editorial_summary"] = matching_input["place_id"].map(lambda p: details.get(p, {}).get("editorial_summary"))
     matching_input["google_reviews"] = matching_input["place_id"].map(lambda p: details.get(p, {}).get("reviews", []))
     state["usage"]["api_calls"]["google_places"] += len(details)
+    # Photos and text evidence don't depend on each other: run them together.
+    photo_mode = str(settings.get("photo_vibe", "auto")).lower()
+    want_photos = photo_mode == "always" or (photo_mode == "auto" and "photo_vibe" in order)
+    photo_future = None
+    if want_photos:
+        notify("photo_vibe", "Looking at photos of the top places")
+        photo_future = pool.submit(_timed, timings, "photo_vibe", photo_vibe_agent, matching_input,
+                                   {pid: d.get("photos") or [] for pid, d in details.items()}, user_prompt,
+                                   settings["photo_max_places"], settings["photos_per_place"])
     rag = _timed(timings, "venue_rag", venue_rag_agent, resources.embedder, matching_input, user_prompt,
                  settings["rag_max_places"], settings["rag_top_k_chunks"] + 4)
     assessments = None
@@ -376,9 +386,20 @@ def run_nearby_workflow(
                                     "retrieved_evidence": rag["data"]["retrieved_evidence"].to_dict("records")}
         state["confidence"]["rag_coverage_rate"] = rag["data"]["coverage_rate"]
 
+    photo_assessments = None
+    if photo_future is not None:
+        photo = photo_future.result()
+        if _record(state, "photo_vibe", photo):
+            photo_assessments = photo["data"]["photo_assessments"]
+            state["photo_evidence"] = photo_assessments
+            state["usage"]["api_calls"]["google_place_photos"] += photo["data"]["photos_used"]
+    else:
+        _add(state["agents_skipped"], "photo_vibe")
+
     # ---------------- 10. MATCHING ----------------
     notify("matching", "Ranking the final options")
-    match = _timed(timings, "matching", matching_agent, None, matching_input.drop(columns=["google_reviews"]), assessments)
+    match = _timed(timings, "matching", matching_agent, None, matching_input.drop(columns=["google_reviews"]),
+                   assessments, photo_assessments)
     if _record(state, "matching", match):
         final_df = match["data"]["results"]
         state["ranked_results"] = records(final_df)

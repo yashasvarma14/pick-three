@@ -51,6 +51,7 @@ AGENT_LABELS = {
     "events": "Events",
     "mobility": "Travel time",
     "venue_rag": "Website evidence (RAG)",
+    "photo_vibe": "Photo vibe",
     "matching": "Matching",
     "scoring": "Scoring every place",
     "synthesizer": "Write-up",
@@ -124,6 +125,10 @@ h1, h2, h3, .ticket-name {
 .ticket li { margin: 0.1rem 0; }
 .ticket-caveat { color: #8A4B00; font-size: 0.95rem; margin: 0 0 0.6rem 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.ticket-photos { display: flex; gap: 0.4rem; margin: 0 0 0.6rem 0; overflow-x: auto; }
+.ticket-photos img { height: 96px; width: auto; max-width: 160px; object-fit: cover; border-radius: 6px; flex: 0 0 auto; }
+.ticket-vibe { font-size: 0.95rem; margin: 0 0 0.6rem 0; }
+.photo-credit { font-size: 0.75rem; opacity: 0.7; margin: -0.3rem 0 0.6rem 0; }
 .chip {
   border: 1px solid #C9D2D0;
   border-radius: 999px;
@@ -296,7 +301,7 @@ with st.sidebar:
     st.caption(
         f"Searches left this session: {max(0, RUNS_PER_SESSION - ss.runs_used)}. "
         "Memory lives only in this browser tab."
-        + (" Searches and ratings are logged anonymously (no exact location) to evaluate this class project."
+        + (" Searches and ratings are logged anonymously (no exact location) to evaluate the app."
            if tracker.enabled() else "")
     )
 
@@ -420,6 +425,16 @@ def render_ticket(rank, rec, explanation):
     if isinstance(rec.get("website_uri"), str) and rec["website_uri"]:
         chips.append(chip("Website", rec["website_uri"]))
 
+    # Photo Vibe: thumbnails the vision model looked at, plus what it saw.
+    photo_urls = rec.get("photo_urls") if isinstance(rec.get("photo_urls"), list) else []
+    photos_html = "".join(f'<img src="{html.escape(u)}" alt="Photo of {name}" loading="lazy">'
+                          for u in photo_urls if isinstance(u, str) and u.startswith("https://"))
+    credits = rec.get("photo_attributions") if isinstance(rec.get("photo_attributions"), list) else []
+    tags = rec.get("vibe_tags") if isinstance(rec.get("vibe_tags"), list) else []
+    vibe = text(rec.get("photo_summary"))
+    if tags:
+        chips.extend(chip(t) for t in tags)
+
     bullets = "".join(f"<li>{html.escape(str(b))}</li>" for b in evidence)
     # Built without indentation or blank lines: Markdown would otherwise
     # treat indented HTML as a code block.
@@ -429,7 +444,11 @@ def render_ticket(rank, rec, explanation):
         '<div class="ticket-body">',
         f'<p class="ticket-name">{name}</p>',
         f'<p class="ticket-activity">{activity}</p>',
+        f'<div class="ticket-photos">{photos_html}</div>' if photos_html else "",
+        (f'<p class="photo-credit">Photos: Google Maps'
+         + (f' · {html.escape(", ".join(credits[:3]))}' if credits else "") + "</p>") if photos_html else "",
         f'<p class="ticket-why">{why}</p>' if why else "",
+        f'<p class="ticket-vibe"><strong>From the photos:</strong> {html.escape(vibe)}</p>' if vibe else "",
         f"<ul>{bullets}</ul>" if bullets else "",
         f'<p class="ticket-caveat">Heads up: {html.escape(caveat)}</p>' if caveat else "",
         f'<div class="chips">{"".join(chips)}</div>',
@@ -613,7 +632,8 @@ if result:
         m1.metric("Run time", f"{result.get('runtime_seconds')}s")
         m2.metric("LLM tokens", f"{usage.get('total_tokens', 0):,}")
         m3.metric("Est. LLM cost", f"${usage.get('llm_cost', 0):.4f}")
-        m4.metric("Maps calls", calls.get("google_places", 0) + calls.get("google_routes", 0))
+        m4.metric("Maps calls", calls.get("google_places", 0) + calls.get("google_routes", 0)
+                  + calls.get("google_place_photos", 0))
         timings = result.get("timings") or {}
         if timings:
             st.markdown("**Seconds per step** (some steps run at the same time, so these add up to more than the run time)")
@@ -627,15 +647,16 @@ if result:
         else:
             cols = ["final_rank", "place_name", "source_activity", "rating", "traffic_minutes",
                     "activity_context_score", "place_quality_score", "mobility_score",
-                    "evidence_fit_score", "final_recommendation_score"]
+                    "evidence_fit_score", "photo_vibe_score", "final_recommendation_score"]
             st.dataframe(ranked[[c for c in cols if c in ranked.columns]], hide_index=True, width="stretch",
                          column_config={"final_rank": "Rank", "place_name": "Venue", "source_activity": "Activity",
                                         "rating": "Rating", "traffic_minutes": "Drive (min)",
                                         "activity_context_score": "Activity fit", "place_quality_score": "Venue quality",
                                         "mobility_score": "Travel", "evidence_fit_score": "Website evidence",
+                                        "photo_vibe_score": "Photo vibe",
                                         "final_recommendation_score": "Final score"})
-            st.caption("Final score = 40% activity fit + 25% venue quality + 15% travel + 20% website evidence. "
-                       "Missing signals are dropped and the other weights re-normalized.")
+            st.caption("Final score weights: 40 activity fit, 25 venue quality, 15 travel, 20 website evidence, "
+                       "15 photo vibe. Missing signals are dropped and the rest re-normalized to 100%.")
 else:
     st.caption("Results show up here as three ranked picks, with a map, live events, and a trace of every agent decision.")
 

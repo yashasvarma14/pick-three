@@ -49,7 +49,7 @@ _local = threading.local()
 
 
 @ttl_cache(seconds=15 * 60, maxsize=256)
-def _cached_call(system_prompt, user_message, model):
+def _cached_call(system_prompt, user_message, model, image_urls=()):
     _local.made_request = True
     kwargs = {}
     effort = config.get_setting("OPENAI_REASONING_EFFORT")
@@ -57,11 +57,17 @@ def _cached_call(system_prompt, user_message, model):
         # Optional speed knob for reasoning models ("low" or "minimal").
         kwargs["reasoning"] = {"effort": str(effort)}
 
+    content = user_message
+    if image_urls:
+        # "low" detail: one small tile per photo, enough to judge the look of
+        # a room and a fraction of the tokens of full resolution.
+        content = [{"type": "input_text", "text": user_message}] + [
+            {"type": "input_image", "image_url": url, "detail": "low"} for url in image_urls]
     response = get_client().responses.create(
         model=model,
         input=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
+            {"role": "user", "content": content},
         ],
         **kwargs,
     )
@@ -73,10 +79,11 @@ def _cached_call(system_prompt, user_message, model):
     return parse_json_text(response.output_text), (input_tokens, output_tokens, total_tokens)
 
 
-def call_llm_json(system_prompt, user_message, model=None):
+def call_llm_json(system_prompt, user_message, model=None, image_urls=None):
     """
     Call the model and return (parsed_json, usage_dict).
     Raises on API or parsing failure so the calling agent can report it.
+    image_urls: optional public image URLs sent alongside the text.
 
     An identical prompt within 15 minutes (the same example search clicked
     twice, the same venues to check) reuses the earlier answer, costs
@@ -84,7 +91,8 @@ def call_llm_json(system_prompt, user_message, model=None):
     """
     model = model or config.llm_model()
     _local.made_request = False
-    parsed, (input_tokens, output_tokens, total_tokens) = _cached_call(system_prompt, user_message, model)
+    parsed, (input_tokens, output_tokens, total_tokens) = _cached_call(system_prompt, user_message, model,
+                                                                       tuple(image_urls or ()))
     if not _local.made_request:
         input_tokens = output_tokens = total_tokens = 0
     cost = calculate_llm_cost(input_tokens, output_tokens)
@@ -100,3 +108,36 @@ def call_llm_json(system_prompt, user_message, model=None):
         "cached": not _local.made_request,
     }
     return parsed, usage
+
+
+def merge_usage(usages):
+    """Add up the usage of several calls made for one agent (e.g. one per venue)."""
+    usages = [u for u in usages if u]
+    merged = {key: sum(u.get(key, 0) or 0 for u in usages)
+              for key in ["input_tokens", "output_tokens", "total_tokens", "input_cost", "output_cost", "cost"]}
+    merged["model"] = next((u.get("model") for u in usages if u.get("model")), None)
+    merged["cached"] = bool(usages) and all(u.get("cached") for u in usages)
+    merged["calls"] = len(usages)
+    return merged
+
+
+def run_concurrently(func, items, max_workers=6):
+    """
+    func(item) for every item at the same time; returns a list of
+    (result, None) or (None, exception) in input order. LLM latency is
+    mostly output length, so several small calls in parallel finish much
+    sooner than one call that writes every answer.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def safe(item):
+        try:
+            return func(item), None
+        except Exception as exc:  # one failed venue must not sink the rest
+            return None, exc
+
+    items = list(items)
+    if len(items) <= 1:
+        return [safe(i) for i in items]
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(items))) as pool:
+        return list(pool.map(safe, items))

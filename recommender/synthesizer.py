@@ -15,6 +15,7 @@ EVIDENCE_FIELDS = [
     "distance_miles", "traffic_minutes", "mobility_score", "evidence_fit_score",
     "rag_evidence_summary", "rag_strengths", "rag_concerns", "final_recommendation_score",
     "primary_type", "open_at_planned_time", "straight_line_miles",
+    "photo_vibe_score", "vibe_tags", "photo_summary", "visual_concerns",
 ]
 
 SYSTEM_PROMPT = """
@@ -26,8 +27,8 @@ or events. Only explain the supplied recommendations using the supplied
 workflow context.
 
 When a signal is unavailable, do not mention it (no distance talk if
-distance_miles is null, no website claims without RAG evidence, no weather
-talk if weather was skipped). Only mention an event if it is clearly related.
+distance_miles is null, no website claims without RAG evidence, no photo or
+look claims without photo_summary, no weather talk if weather was skipped). Only mention an event if it is clearly related.
 
 Explain in plain, friendly language. Do not list internal model scores.
 

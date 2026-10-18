@@ -68,11 +68,17 @@ DEFAULTS = {
     "rag_max_places": 5,
     "rag_top_k_chunks": 10,
     "place_relevance_threshold": 0.60,
-    "max_agent_calls": 9,
+    "max_agent_calls": 10,
     "max_adaptation_retries": 1,
     "final_recommendations": 3,
+    # Photo Vibe Agent: "auto" follows the planner, "always" or "off".
+    "photo_vibe": "auto",
+    "photo_max_places": 5,
+    "photos_per_place": 3,
 }
 
 # Scoring weights, kept in one place so experiments can change them.
 DISCOVERY_WEIGHTS = {"semantic": 0.70, "group": 0.15, "budget": 0.10, "category": 0.05}
-MATCHING_WEIGHTS = {"activity": 0.40, "place": 0.25, "mobility": 0.15, "evidence": 0.20}
+# Relative weights: whatever signals a venue has are re-normalized to sum
+# to 1, so without photos the first four keep their 40/25/15/20 split.
+MATCHING_WEIGHTS = {"activity": 0.40, "place": 0.25, "mobility": 0.15, "evidence": 0.20, "vibe": 0.15}

@@ -4,9 +4,9 @@
 
 Describe a plan in plain English, like *"four of us want something fun and social tonight, not too expensive"*, and the app returns three real, nearby places with an explanation of why each one fits.
 
-Behind the scenes, a planner LLM decides which specialist agents the request actually needs (weather, live events, drive times, venue websites), runs them, adapts when a step comes back empty, and ranks the results with transparent, deterministic scoring. The app shows its work: every agent it ran or skipped, why, and how each venue was scored.
+Behind the scenes, a planner LLM decides which specialist agents the request actually needs (weather, live events, drive times, venue websites, venue photos), runs them side by side where it can, adapts when a step comes back empty, and ranks the results with transparent, deterministic scoring. The app shows its work: every agent it ran or skipped, why, and how each venue was scored.
 
-Built as the final project for **Analytics for Unstructured Data** (MSBA, McCombs School of Business, UT Austin, Fall 2026).
+Started as a final project for **Analytics for Unstructured Data** (MSBA, McCombs School of Business, UT Austin, Fall 2026) and extended since as a personal project.
 
 <!-- Add a screenshot: save one as docs/screenshot.png and uncomment the next line -->
 <!-- ![App screenshot](docs/screenshot.png) -->
@@ -28,7 +28,9 @@ flowchart TD
     SC --> MO[Drive times on shortlist<br/>Google Routes, live traffic]
     V --> R[Evidence RAG<br/>Google reviews + venue websites<br/>chunk, embed, retrieve, grounded LLM]
     MO --> R
+    MO --> PV[Photo Vibe<br/>Google Maps photos<br/>vision LLM, one call per venue]
     R --> MA[Matching<br/>weighted score]
+    PV --> MA
     MA --> S[Synthesizer LLM<br/>explains, cannot re-rank]
     S --> F[User feedback -> memory]
 ```
@@ -46,9 +48,12 @@ The original city-and-catalog pipeline from the course notebook is kept in `reco
 | Venue check | Removes venues that are only textually related to the activity | LLM validation |
 | Travel time | Drive time with traffic from your starting point | Google Routes API |
 | Live events | Concerts, sports and shows in the time window | Ticketmaster Discovery API |
-| Website evidence (RAG) | Reads each venue's site and judges fit from retrieved passages only | Chunking, embeddings, top-k retrieval, grounded LLM |
-| Matching | Final ranking | 40% activity fit, 25% venue quality, 15% travel, 20% website evidence |
+| Website evidence (RAG) | Reads each venue's site and judges fit from retrieved passages only | Chunking, embeddings, top-k retrieval, grounded LLM (one call per venue, in parallel) |
+| Photo vibe | Looks at each shortlisted venue's Google Maps photos and judges whether the atmosphere fits (cozy, lively, romantic, scenic...) | Places photos + vision LLM, one call per venue, in parallel; the planner skips it for purely functional requests |
+| Matching | Final ranking | Relative weights 40 activity fit, 25 venue quality, 15 travel, 20 website evidence, 15 photo vibe |
 | Synthesizer | Plain-language explanation; code verifies it kept the ranking | LLM |
+
+**Speed:** agents that don't depend on each other run at the same time: weather and events run during planning, the Maps searches run together, drive times and reviews load during the venue check, the venue check is split into small batches checked at once, and the website-evidence and photo agents run side by side with one call per venue. LLM latency mostly depends on how much the model writes, so several short calls at once finish much sooner than one long one.
 
 **Design principle:** LLMs interpret and explain; Python does all arithmetic. When a signal is missing (no starting point, no website), it is dropped and the remaining weights are re-normalized rather than filled with a made-up value.
 
@@ -82,7 +87,7 @@ Upload this repo as `activity-recommender.zip` to the project's Google Drive fol
 | `GOOGLE_MAPS_API_KEY` | Venues and drive times | Enable **Places API (New)** and **Routes API** |
 | `TICKETMASTER_API_KEY` | Live events | Optional; the Events agent is skipped without it |
 
-Weather uses Open-Meteo, which needs no key.
+Weather uses Open-Meteo, which needs no key. The Photo Vibe agent uses the same Google key (Places API (New) photos) and needs a vision-capable `OPENAI_MODEL`; set `photo_vibe` to `"off"` in `recommender/config.py` to turn it off.
 
 ## Deploy your own copy (Streamlit Community Cloud)
 
@@ -96,13 +101,13 @@ Weather uses Open-Meteo, which needs no key.
 Every search calls paid APIs, so the app limits searches per visitor (`RUNS_PER_SESSION`) and per day (`RUNS_PER_DAY`). Also set limits on the provider side:
 
 - **OpenAI:** set a monthly budget and usage limit in your organization's billing settings.
-- **Google Cloud:** restrict the key to Places API (New) and Routes API, and set per-day request quotas for each.
+- **Google Cloud:** restrict the key to Places API (New) and Routes API, and set per-day request quotas for each. Each photo the Photo Vibe agent downloads is a billed Place Photo request (up to 3 photos x 5 venues per search, only when the planner thinks the look matters).
 
 Visitor memory is kept in the browser session only, so visitors never see or change each other's preferences.
 
 ## Live tracker (optional)
 
-Every search and rating can be logged to a Google Sheet so the team can see what people ask for, how long runs take, what they cost, and how often picks are rated helpful.
+Every search and rating can be logged to a Google Sheet so you can see what people ask for, how long runs take, what they cost, and how often picks are rated helpful.
 
 1. Create a Google Sheet, open **Extensions → Apps Script**, paste `tracker_apps_script.gs`, and set `TOKEN` to a random string.
 2. Run `setup` once, then **Deploy → New deployment → Web app** (execute as you, access: anyone) and copy the `/exec` URL.
@@ -135,6 +140,7 @@ recommender/
   events.py                Ticketmaster events
   mobility.py              Google Routes travel time
   rag.py                   Website retrieval-augmented evidence
+  photos.py                Photo Vibe agent: Google Maps photos + vision LLM
   matching.py              Final weighted ranking
   synthesizer.py           Grounded explanation
   llm.py, config.py, base.py, data.py   Shared plumbing
@@ -142,9 +148,9 @@ scripts/build_catalog.py   Raw Kaggle file -> 196-row catalog
 tests/                     Offline end-to-end tests
 ```
 
-## Team
+## Author
 
-Built by [Jacob Posner](https://www.linkedin.com/in/YOUR-LINKEDIN) with TEAMMATE NAMES as a group project for MSBA Analytics for Unstructured Data, taught by Dr. Anitesh Barua.
+Built by Yashas Varma.
 
 ## Limitations and next steps
 
@@ -152,5 +158,5 @@ Built by [Jacob Posner](https://www.linkedin.com/in/YOUR-LINKEDIN) with TEAMMATE
 - The Kaggle activity catalog has 196 generic concepts, and only 53 are outings you can find a venue for (the rest, like "Take a nap", are filtered out; see `recommender/outings.py`). That finding is why the app searches Google Maps around the visitor instead of relying on the catalog.
 - Google returns at most 60 places per search phrase ("Search deeper" fetches all 60; the default is 20 to stay fast).
 - Opening hours come from Google's weekly schedule and don't include holiday changes.
-- Image-based "vibe" analysis of venue photos was scoped but not built.
+- Photo vibe judges a handful of Google photos, which can be old or unrepresentative; the agent is told to stay neutral when photos are unclear.
 - The fixed (non-agentic) baseline from the research notebook is not exposed in the app; comparing the two on cost and quality is the natural next experiment.
