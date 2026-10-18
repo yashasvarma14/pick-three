@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from recommender.data import DATA_DIR, load_activity_catalog  # noqa: E402
+from recommender.core.catalog import DATA_DIR, load_activity_catalog  # noqa: E402
 
 
 def main():

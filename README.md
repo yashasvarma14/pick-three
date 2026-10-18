@@ -35,23 +35,25 @@ flowchart TD
     S --> F[User feedback -> memory]
 ```
 
-The original city-and-catalog pipeline from the course notebook is kept in `recommender/workflow.py` (`run_adaptive_workflow`) for comparison; the app uses `recommender/nearby_workflow.py` (`run_nearby_workflow`).
+The whole search is one function, `run_pipeline()` in [`recommender/pipeline.py`](recommender/pipeline.py). It's written as numbered steps, and each agent file starts with the step number it belongs to, so the best way to follow the code is to read `pipeline.py` top to bottom and open each agent as it comes up.
 
-| Agent | What it does | Method |
-|---|---|---|
-| Planner / Orchestrator | Chooses which agents a request needs; code enforces dependencies and a call limit | LLM + deterministic validation |
-| Preference | Turns free text into city, group size, budget, likes, dislikes, hard vs. soft constraints | LLM, JSON output |
-| Discovery | Ranks 196 activity concepts by meaning, not keywords | `all-MiniLM-L6-v2` embeddings, cosine similarity, plus group/budget/category fit |
-| Memory | Applies earlier feedback: filters disliked concepts, boosts liked ones | Embedding similarity + narrow keyword filter |
-| Weather | Scores outdoor suitability; penalizes outdoor activities more than indoor ones | Open-Meteo, rule-based |
-| Local places | Finds real venues for the top activities | Google Places API (New) |
-| Venue check | Removes venues that are only textually related to the activity | LLM validation |
-| Travel time | Drive time with traffic from your starting point | Google Routes API |
-| Live events | Concerts, sports and shows in the time window | Ticketmaster Discovery API |
-| Website evidence (RAG) | Reads each venue's site and judges fit from retrieved passages only | Chunking, embeddings, top-k retrieval, grounded LLM (one call per venue, in parallel) |
-| Photo vibe | Looks at each shortlisted venue's Google Maps photos and judges whether the atmosphere fits (cozy, lively, romantic, scenic...) | Places photos + vision LLM, one call per venue, in parallel; the planner skips it for purely functional requests |
-| Matching | Final ranking | Relative weights 40 activity fit, 25 venue quality, 15 travel, 20 website evidence, 15 photo vibe |
-| Synthesizer | Plain-language explanation; code verifies it kept the ranking | LLM |
+| Step | Agent | File | What it does | Method |
+|---|---|---|---|---|
+| 1 | Planner | `agents/planner.py` | Chooses which agents a request needs; code enforces dependencies and a call limit | LLM + Python validation |
+| 1 | Preference | `agents/preference.py` | Turns free text into group size, budget, likes, dislikes, a time, and Google Maps searches | LLM, JSON output |
+| 2 | Discovery | `agents/discovery.py` | Ranks the catalog's real outings by meaning; adds ideas for open-ended requests | `all-MiniLM-L6-v2` embeddings + group/budget/category fit |
+| 3 | Weather | `agents/weather.py` | Outdoor suitability score for the planned time | Open-Meteo, rule-based |
+| 4 | Place search | `agents/place_search.py` | Every search phrase, boxed to your drive range | Google Places API (New) |
+| 5 | Scoring | `agents/place_scoring.py` | Scores every place found: fit, rating, distance, open hours, weather | Embeddings + simple math |
+| 6 | Shortlist | `agents/shortlist.py` | One listing per business, no smoke shops, some variety | Python rules |
+| 7 | Venue check | `agents/relevance.py` | Removes places that only sound related ("business idea" -> an economic development office) | LLM, batches checked in parallel |
+| 8 | Travel time | `agents/travel_time.py` | Live drive times, then the drive limit | Google Routes API |
+| 9a | Review + website evidence | `agents/review_rag.py` | Judges fit from Google reviews and the venue's own site | Chunking, embeddings, top-k retrieval, grounded LLM (one call per venue, in parallel) |
+| 9b | Photo vibe | `agents/photo_vibe.py` | Judges the atmosphere from Google Maps photos (cozy, lively, romantic...) | Vision LLM, one call per venue, in parallel; skipped when the look doesn't matter |
+| 10 | Matching | `agents/matching.py` | Final ranking | Relative weights: 40 activity fit, 25 venue quality, 15 travel, 20 evidence, 15 photo vibe |
+| 11 | Write-up | `agents/writeup.py` | Plain-language explanation; code checks it kept the ranking | LLM |
+| - | Events | `agents/events.py` | Concerts, sports and shows near you in the time window (own tab) | Ticketmaster Discovery API |
+| - | Memory + feedback | `agents/memory.py` | Your feedback becomes memory: skips searches for things you're not into, drops places you rejected | LLM + Python |
 
 **Speed:** agents that don't depend on each other run at the same time: weather and events run during planning, the Maps searches run together, drive times and reviews load during the venue check, the venue check is split into small batches checked at once, and the website-evidence and photo agents run side by side with one call per venue. LLM latency mostly depends on how much the model writes, so several short calls at once finish much sooner than one long one.
 
@@ -74,10 +76,6 @@ The activity catalog lives in `data/activities_catalog.csv` (196 rows). To rebui
 ```bash
 python scripts/build_catalog.py path/to/activity.json
 ```
-
-## Test it in Google Colab (no local setup)
-
-Upload this repo as `activity-recommender.zip` to the project's Google Drive folder, open `Run Streamlit App (test).ipynb` in Colab, and choose **Runtime → Run all**. It reads the API keys from Colab Secrets, runs the offline tests and one real search, starts the app, and prints a temporary link.
 
 ## API keys
 
@@ -122,30 +120,27 @@ pip install pytest
 python -m pytest -q
 ```
 
-The tests run the full pipeline offline with every API and the embedding model faked, so they need no keys.
+The tests run the full pipeline offline with every API and the embedding model faked (`tests/fakes.py`), so they need no keys and cost nothing. `test_pipeline.py` runs whole searches; `test_rules.py` covers the scoring and shortlist rules.
 
 ## Project structure
 
 ```
-app.py                     Streamlit UI
+app.py                      the Streamlit page, put together from ui/
+ui/
+  sidebar.py                location, time, drive limit, memory panel
+  picks.py                  the three ticket cards + rating and feedback
+  details.py                tabs: all places, map, events, agent trace, scores
+  styles.py, labels.py      CSS and on-page text
 recommender/
-  workflow.py              Adaptive workflow: plan -> agents -> adapt -> rank -> explain
-  orchestrator.py          Planner LLM and plan validation
-  preference.py            Request -> structured intent
-  discovery.py             Embedding-based activity retrieval
-  memory.py                Feedback agent, memory filter
-  weather.py               Geocoding, forecast, weather-aware reranking
-  places.py                Google Places search
-  relevance.py             Venue/activity validation
-  events.py                Ticketmaster events
-  mobility.py              Google Routes travel time
-  rag.py                   Website retrieval-augmented evidence
-  photos.py                Photo Vibe agent: Google Maps photos + vision LLM
-  matching.py              Final weighted ranking
-  synthesizer.py           Grounded explanation
-  llm.py, config.py, base.py, data.py   Shared plumbing
-scripts/build_catalog.py   Raw Kaggle file -> 196-row catalog
-tests/                     Offline end-to-end tests
+  pipeline.py               run_pipeline(): the whole search, numbered steps 1-11
+  agents/                   one file per agent (step number at the top of each)
+  services/                 raw API calls: Google Places/Routes, Open-Meteo,
+                            Ticketmaster, venue websites, location lookup, tracker
+  core/                     config (keys + every tunable number), LLM wrapper,
+                            cache, shared run state, catalog + embedding model
+scripts/build_catalog.py    raw Kaggle file -> 196-row catalog
+notebooks/                  the original research notebook from the course
+tests/                      offline tests (fakes.py stands in for every API)
 ```
 
 ## Author

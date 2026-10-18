@@ -1,15 +1,23 @@
-"""Adaptive Agentic Activity Recommender."""
+"""
+Tonight, Sorted: an agentic activity recommender.
 
-from .data import Resources, build_resources, load_activity_catalog
-from .memory import create_empty_user_memory, feedback_agent, update_memory_from_feedback
-from .workflow import run_adaptive_workflow
+    pipeline.py   run_pipeline(): one search, start to finish (read this first)
+    agents/       one file per agent, numbered in the order the pipeline uses them
+    services/     the raw API calls (Google, Open-Meteo, Ticketmaster, websites)
+    core/         settings, the LLM wrapper, caching and the shared run state
+"""
+
+from .agents.memory import create_empty_user_memory, feedback_agent, update_memory_from_feedback
+from .core.catalog import build_resources
+from .pipeline import run_pipeline, synthesize_results
+from .services.location import resolve_location
 
 __all__ = [
-    "Resources",
     "build_resources",
-    "load_activity_catalog",
     "create_empty_user_memory",
     "feedback_agent",
+    "resolve_location",
+    "run_pipeline",
+    "synthesize_results",
     "update_memory_from_feedback",
-    "run_adaptive_workflow",
 ]

@@ -1,309 +1,310 @@
 """
-Offline end-to-end test: every external service is faked, so this runs
-without API keys or network. Run with:  python -m pytest -q
+End-to-end tests: whole searches through run_pipeline(), with every
+outside service faked (see fakes.py). No API keys or network needed.
 """
 
-import hashlib
-import json
 from datetime import datetime, timedelta
-from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
-import recommender.llm as llm
-from recommender import build_resources, create_empty_user_memory, run_adaptive_workflow
-from recommender.base import contains_keyword
-from recommender.events import build_event_window_utc
-from recommender.matching import calculate_final_recommendation_score
-from recommender.places import build_place_query
-
-FIXTURE = Path(__file__).parent / "fixtures" / "activity_sample.json"
+from fakes import CALLS, HOME, FakeResponse, nearby_get, nearby_llm, nearby_post, use_llm
+from recommender import (create_empty_user_memory, feedback_agent, resolve_location, run_pipeline,
+                         synthesize_results, update_memory_from_feedback)
 
 
-class FakeEmbedder:
-    """Deterministic bag-of-words hashing embedder (no model download)."""
-
-    def encode(self, texts):
-        vectors = []
-        for text in texts:
-            v = np.zeros(64)
-            for word in str(text).lower().split():
-                v[int(hashlib.md5(word.strip(".,").encode()).hexdigest(), 16) % 64] += 1
-            n = np.linalg.norm(v)
-            vectors.append(v / n if n else v)
-        return np.array(vectors)
+def test_resolve_location_from_gps_and_text(resources):
+    gps = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    assert gps["origin"].startswith("34.05") and gps["timezone"]
+    typed = resolve_location("downtown LA")
+    assert abs(typed["latitude"] - HOME[0]) < 1e-6
+    assert CALLS.get("osm") == 1  # typed address used the free geocoder...
+    with pytest.raises(LookupError):
+        resolve_location()
 
 
-class FakeResponse:
-    def __init__(self, payload, status=200, content_type="application/json", text=None):
-        self._payload, self.status_code = payload, status
-        self.headers = {"Content-Type": content_type}
-        self.text = text or json.dumps(payload)
-
-    def json(self):
-        return self._payload
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise RuntimeError(f"HTTP {self.status_code}")
-
-
-def fake_get(url, params=None, headers=None, timeout=None):
-    if "geocoding-api" in url:
-        return FakeResponse({"results": [{"name": "Austin", "latitude": 30.27, "longitude": -97.74,
-                                          "country": "United States", "admin1": "Texas", "timezone": "America/Chicago"}]})
-    if "api.open-meteo.com" in url:
-        start = datetime.now().replace(minute=0, second=0, microsecond=0)
-        times = [(start + timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M") for h in range(48)]
-        return FakeResponse({
-            "timezone": "America/Chicago",
-            "current": {"time": times[0], "temperature_2m": 72, "apparent_temperature": 72, "precipitation": 0,
-                        "weather_code": 1, "wind_speed_10m": 6},
-            "hourly": {"time": times, "temperature_2m": [72] * 48, "apparent_temperature": [72] * 48,
-                       "precipitation_probability": [70] * 48, "precipitation": [0.1] * 48,
-                       "weather_code": [63] * 48, "wind_speed_10m": [8] * 48},
-        })
-    if "ticketmaster" in url:
-        return FakeResponse({"_embedded": {"events": [{
-            "id": "E1", "name": "Indie Night", "url": "https://tm.example/e1",
-            "dates": {"start": {"localDate": "2026-10-12", "localTime": "20:00:00"}, "status": {"code": "onsale"}},
-            "classifications": [{"segment": {"name": "Music"}, "genre": {"name": "Rock"}}],
-            "_embedded": {"venues": [{"name": "Mohawk", "city": {"name": "Austin"}, "address": {"line1": "912 Red River"},
-                                      "location": {"latitude": "30.27", "longitude": "-97.73"}}]},
-        }]}})
-    # Venue websites
-    return FakeResponse({}, content_type="text/html",
-                        text="<html><body>" + "Great group games, karaoke rooms and bowling lanes for friends. " * 40 + "</body></html>")
-
-
-PLACE_COUNTER = {"n": 0}
-
-
-def fake_post(url, headers=None, json=None, timeout=None):
-    if "places:searchText" in url:
-        q = json["textQuery"]
-        places = []
-        for i in range(json["maxResultCount"]):
-            PLACE_COUNTER["n"] += 1
-            n = PLACE_COUNTER["n"]
-            places.append({"id": f"P{n}", "displayName": {"text": f"{q.split(' in ')[0].title()} #{i + 1}"},
-                           "formattedAddress": f"{n} Main St, Austin, TX", "location": {"latitude": 30.2 + n / 100, "longitude": -97.7},
-                           "rating": 4.0 + (n % 10) / 10, "userRatingCount": 100 * n, "types": ["point_of_interest"],
-                           "googleMapsUri": f"https://maps.example/{n}", "websiteUri": f"https://venue{n}.example"})
-        return FakeResponse({"places": places})
-    if "computeRoutes" in url:
-        lat = json["destination"]["location"]["latLng"]["latitude"]
-        minutes = int((lat - 30.2) * 300) + 5
-        return FakeResponse({"routes": [{"distanceMeters": minutes * 900, "duration": f"{minutes * 60}s",
-                                         "staticDuration": f"{minutes * 50}s"}]})
-    raise AssertionError(f"Unexpected POST {url}")
-
-
-def fake_llm(system_prompt, user_message, model=None):
-    usage = {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150, "cost": 0.00004}
-    if "Planner / Orchestrator" in system_prompt:
-        return {"goal_summary": "Fun group activity tonight",
-                "agents_to_run": ["preference", ["discovery", "weather"], "local_places", "events", "mobility", "venue_rag", "matching", "bogus"],
-                "human_checkpoint_needed": False, "planning_reasoning_summary": ["test"], "finish_conditions": []}, usage
-    if "Preference Agent" in system_prompt:
-        terms = ["cheap burger restaurant"] if "burger" in user_message.lower() else []
-        return {"venue_search_terms": terms, "city": "Austin", "group_size": 4, "budget_level": "low", "preferred_types": ["social", "notatype"],
-                "positive_preferences": ["interactive"], "negative_preferences": [], "hard_constraints": [],
-                "soft_preferences": [], "needs_clarification": False, "clarification_question": None}, usage
-    if "venue relevance validator" in system_prompt:
-        rows = json_loads_tail(user_message)
-        # Return row_id as strings to exercise the type fix; reject the first row.
-        return {"assessments": [{"row_id": str(r["row_id"]), "place_activity_relevance_score": 0.2 if r["row_id"] == 0 else 0.9,
-                                 "relevance_reason": "ok"} for r in rows]}, usage
-    if "Venue Evidence RAG Agent" in system_prompt:
-        ids = [line.split("place_id: ")[1].split(" |")[0] for line in user_message.splitlines() if line.startswith("- place_id: ")]
-        return {"venue_assessments": [{"place_id": pid, "place_name": "x", "evidence_fit_score": 0.8,
-                                       "supported_strengths": ["groups"], "supported_concerns": [],
-                                       "evidence_summary": "Site mentions group games.", "evidence_sufficient": True}
-                                      for pid in ids]}, usage
-    if "final Synthesizer" in system_prompt:
-        ctx = json.loads(user_message.split("WORKFLOW CONTEXT:\n", 1)[1])
-        return {"overall_summary": "Three good picks.",
-                "recommendations": [{"final_rank": r["final_rank"], "place_name": r["place_name"], "source_activity": r["source_activity"],
-                                     "why_it_fits": "Fits.", "supporting_evidence": ["Well rated"], "important_caveat": None}
-                                    for r in ctx["recommendations"]],
-                "personalization_summary": "", "evidence_limitations": []}, usage
-    if "Feedback Agent" in system_prompt:
-        return {"liked_activities": [], "disliked_activities": ["movies"], "liked_places": [], "rejected_places": [],
-                "positive_preferences": ["active"], "negative_preferences": [], "budget_preference": None,
-                "max_travel_minutes": 15, "feedback_summary": "No movies."}, usage
-    raise AssertionError("Unexpected LLM prompt")
-
-
-def json_loads_tail(message):
-    return json.loads(message.split("\n", 1)[1])
-
-
-@pytest.fixture
-def resources(monkeypatch):
-    for module in ["recommender.weather", "recommender.events", "recommender.rag"]:
-        monkeypatch.setattr(f"{module}.requests.get", fake_get)
-    for module in ["recommender.places", "recommender.mobility"]:
-        monkeypatch.setattr(f"{module}.requests.post", fake_post)
-    for module in ["recommender.preference", "recommender.relevance", "recommender.rag",
-                   "recommender.orchestrator", "recommender.synthesizer", "recommender.memory"]:
-        monkeypatch.setattr(f"{module}.call_llm_json", fake_llm)
-    monkeypatch.setenv("GOOGLE_MAPS_API_KEY", "test")
-    monkeypatch.setenv("TICKETMASTER_API_KEY", "test")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
-    from recommender.weather import geocode_city
-    geocode_city.cache_clear()
-    return build_resources(FIXTURE, embedder=FakeEmbedder())
-
-
-def test_catalog_deduplicates(resources):
-    assert resources.activities["activity"].is_unique
-    assert len(resources.activities) < len(pd.read_json(FIXTURE, lines=True))
-
-
-def test_full_adaptive_run(resources):
-    steps = []
-    state = run_adaptive_workflow(
-        resources, "Four of us want something fun and interactive in Austin tonight",
-        memory=None, city="Austin, TX", origin="UT Austin",
-        target_datetime=datetime.now() + timedelta(hours=3),
-        progress=lambda key, msg: steps.append(key),
-    )
+def test_near_me_finds_and_keeps_every_place(resources):
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc,
+                                target_datetime=datetime(2026, 10, 16, 20, 0), max_travel_minutes=20)
     assert not state["errors"], state["errors"]
-    assert state["final_recommendations"], state["finish_reason"]
+    # Every search is boxed around the visitor.
+    assert CALLS["search"] and all("locationRestriction" in body for body in CALLS["search"])
+    assert all("burger" in body["textQuery"] for body in CALLS["search"])
+    places = pd.DataFrame(state["all_places"])
+    assert len(places) >= 10  # every place found is kept for the map/list
+    assert "Far Away Place" not in set(places["place_name"])  # 2,400 miles away: dropped
+    assert places["top_pick"].notna().sum() == len(state["final_recommendations"]) == 3
+    # The morning-only places are closed at 8 PM, so none is a top pick.
+    assert not any(r["place_id"].endswith("-0") for r in state["final_recommendations"])
+    # Reviews were read for the shortlist only.
+    assert 0 < CALLS["details"] <= 12
+    evidence = pd.DataFrame(state["review_evidence"]["retrieved_evidence"])
+    assert evidence["website_uri"].str.startswith("Google review").any()
     assert state["final_response"]["overall_summary"]
-    assert "bogus" not in state["orchestrator_plan"]["execution_order"]
-    assert state["orchestrator_plan"]["execution_order"][0] == "preference"
-    assert state["confidence"]["place_relevance_removed"] >= 1  # string row_ids were matched
-    assert state["events"] and state["events"][0]["event_name"] == "Indie Night"
-    assert all(r["evidence_fit_score"] == 0.8 for r in state["final_recommendations"])
-    assert state["usage"]["api_calls"]["google_places"] > 0
-    assert "synthesizer" in steps
+    # Drive times came from the visitor's coordinates and respect the limit.
+    assert all(r["traffic_minutes"] <= 25 for r in state["final_recommendations"])
 
 
-def test_no_origin_leaves_mobility_missing(resources):
-    state = run_adaptive_workflow(resources, "Indoor idea for four people in Austin", city="Austin", origin=None)
+def test_ai_searches_come_first_and_catalog_only_fills_gaps(resources, monkeypatch):
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "Something relaxing and quiet for two", loc, synthesize=False)
+    # The AI gave 3 searches: all used, no generic catalog idea squeezed in, no misleading note.
+    assert state["search_phrases"] == ["quiet wine bar", "day spa", "botanical garden"]
+    assert not any("not into" in line for line in state["adaptation_log"])
+
+    def one_idea(system_prompt, user_message, model=None):
+        parsed, usage = nearby_llm(system_prompt, user_message, model)
+        if "Preference Agent" in system_prompt:
+            parsed = dict(parsed, search_phrases=["quiet wine bar"])
+        return parsed, usage
+
+    use_llm(monkeypatch, one_idea)
+    state = run_pipeline(resources, "Something relaxing and quiet for two", loc, synthesize=False)
+    assert state["search_phrases"][0] == "quiet wine bar" and len(state["search_phrases"]) == 3  # catalog filled the gap
+
+
+def test_memory_skips_disliked_searches(resources):
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    memory = {"user_id": "v", "disliked_activities": ["spa"], "liked_activities": [], "liked_places": [],
+              "rejected_places": [], "positive_preferences": [], "negative_preferences": []}
+    state = run_pipeline(resources, "Something relaxing and quiet for two", loc, memory=memory, synthesize=False)
+    assert "day spa" not in state["search_phrases"]
+
+
+def test_tight_drive_limit_removes_far_places(resources):
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, max_travel_minutes=5,
+                                target_datetime=datetime(2026, 10, 16, 20, 0), synthesize=False)
     assert state["final_recommendations"]
-    assert all(pd.isna(r.get("mobility_score")) for r in state["ranked_results"])
-    assert "mobility" in state["agents_skipped"]
+    assert all(r["traffic_minutes"] <= 10 for r in state["final_recommendations"])
 
 
-def test_memory_feedback_round_trip(resources):
-    from recommender import feedback_agent, update_memory_from_feedback
+def test_no_missing_numbers_reach_the_app(resources, monkeypatch):
+    """Regression: a top pick without review/website evidence crashed the card (NaN summary)."""
+    def no_evidence(system_prompt, user_message, model=None):
+        parsed, usage = nearby_llm(system_prompt, user_message, model)
+        if "Venue Evidence RAG Agent" in system_prompt:
+            parsed = {"venue_assessments": []}
+        return parsed, usage
 
+    use_llm(monkeypatch, no_evidence)
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert state["final_recommendations"]
+    for rows in [state["final_recommendations"], state["ranked_results"], state["all_places"]]:
+        for row in rows:
+            assert not any(isinstance(v, float) and v != v for v in row.values())
+
+
+def _rate_limited(fail_query=None, fail_times=99):
+    """Fake Google that answers 429 for one search (or all searches)."""
+    seen = {}
+
+    def post(url, headers=None, json=None, timeout=None):
+        q = (json or {}).get("textQuery", "")
+        if "places:searchText" in url and json.get("pageSize") != 1 and (fail_query is None or q == fail_query):
+            seen[q] = seen.get(q, 0) + 1
+            if seen[q] <= fail_times:
+                resp = FakeResponse({"error": {"code": 429, "status": "RESOURCE_EXHAUSTED",
+                                               "message": "Quota exceeded for quota metric 'SearchTextRequest' per minute."}}, status=429)
+                return resp
+        return nearby_post(url, headers, json, timeout)
+    return post, seen
+
+
+def test_one_rejected_search_does_not_sink_the_run(resources, monkeypatch):
+    monkeypatch.setattr("recommender.services.google_places.time.sleep", lambda s: None)
+    post, _ = _rate_limited(fail_query="smash burger")
+    monkeypatch.setattr("requests.post", post)
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert state["final_recommendations"], state["errors"]
+    assert any("turned down 1 of" in line for line in state["adaptation_log"])
+
+
+def test_brief_rate_limit_is_retried(resources, monkeypatch):
+    waits = []
+    monkeypatch.setattr("recommender.services.google_places.time.sleep", waits.append)
+    post, seen = _rate_limited(fail_times=2)
+    monkeypatch.setattr("requests.post", post)
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert state["final_recommendations"]
+    assert not any("turned down" in line for line in state["adaptation_log"])
+    assert waits and all(v == 3 for v in seen.values())  # two 429s, then success
+
+
+def test_all_searches_rejected_explains_why(resources, monkeypatch):
+    monkeypatch.setattr("recommender.services.google_places.time.sleep", lambda s: None)
+    post, _ = _rate_limited()
+    monkeypatch.setattr("requests.post", post)
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert not state["final_recommendations"]
+    assert "RESOURCE_EXHAUSTED" in " ".join(state["errors"])
+
+
+def test_relevance_check_sees_the_request(resources, monkeypatch):
+    seen = []
+
+    def spy(system_prompt, user_message, model=None):
+        if "venue relevance validator" in system_prompt:
+            seen.append(user_message)
+        return nearby_llm(system_prompt, user_message, model)
+
+    use_llm(monkeypatch, spy)
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert seen and "I want cheap burgers" in seen[0].split("\n")[0]
+
+
+def test_no_duplicate_businesses_in_a_full_run(resources, monkeypatch):
+    def chains(url, headers=None, json=None, timeout=None):
+        resp = nearby_post(url, headers, json, timeout)
+        if "places:searchText" in url and json.get("pageSize") != 1:
+            for i, p in enumerate(resp._payload["places"]):
+                p["websiteUri"] = "https://www.burgerchain.com/" + str(i)  # every result is one chain
+                p["displayName"] = {"text": f"Burger Chain {json['textQuery']} {i}"}
+        return resp
+
+    monkeypatch.setattr("requests.post", chains)
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert len(state["final_recommendations"]) == 1  # one chain = one pick, never three branches
+
+
+def _llm_with(planner_question=None, afternoon=False):
+    from datetime import datetime as _dt, timedelta as _td
+
+    def llm(system_prompt, user_message, model=None):
+        parsed, usage = nearby_llm(system_prompt, user_message, model)
+        if planner_question and "Planner / Orchestrator" in system_prompt:
+            parsed = dict(parsed, human_checkpoint_needed=True, clarification_question=planner_question)
+        if afternoon and "Preference Agent" in system_prompt:
+            stamp = user_message.split("Current local date and time: ")[1][:26].split(".")[0]
+            now = _dt.strptime(" ".join(stamp.split()[1:3]), "%Y-%m-%d %H:%M")
+            parsed = dict(parsed, requested_datetime=(now + _td(hours=3)).strftime("%Y-%m-%d %H:%M"))
+        return parsed, usage
+    return llm
+
+
+def test_planner_question_does_not_stop_the_search(resources, monkeypatch):
+    use_llm(monkeypatch, _llm_with(planner_question="Did you mean this afternoon or tonight?"))
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "Indoor activity for a rainy afternoon with my roommates.", loc,
+                                target_datetime=datetime(2026, 10, 16, 20, 0), synthesize=False)
+    assert state["final_recommendations"], state["finish_reason"]
+    assert state["clarification_question"] == "Did you mean this afternoon or tonight?"
+
+
+def test_time_in_the_request_overrides_the_app_setting(resources, monkeypatch):
+    use_llm(monkeypatch, _llm_with(afternoon=True))
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    far_off = datetime.now() + timedelta(days=5)
+    state = run_pipeline(resources, "Something fun this afternoon", loc, target_datetime=far_off, synthesize=False)
+    assert state["time_used"] != far_off.isoformat(sep=" ", timespec="minutes")
+    assert any(line.startswith("Your request mentions a time") for line in state["adaptation_log"])
+
+
+def _relevance_scores(score_for):
+    """Fake relevance check: score_for(place_name) -> score."""
+    import json as _json
+
+    def llm(system_prompt, user_message, model=None):
+        parsed, usage = nearby_llm(system_prompt, user_message, model)
+        if "venue relevance validator" in system_prompt:
+            rows = _json.loads(user_message.split("\n", 1)[1])
+            parsed = {"assessments": [{"row_id": r["row_id"], "place_activity_relevance_score": score_for(r["place_name"]),
+                                       "relevance_reason": "test"} for r in rows]}
+        return parsed, usage
+    return llm
+
+
+def test_relevance_check_retries_with_the_next_batch(resources, monkeypatch):
+    # Only one search's places fit; the first batch of 12 doesn't hold enough of them.
+    use_llm(monkeypatch, _relevance_scores(lambda name: 0.9 if name.startswith("Burger Joint") else 0.1))
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False,
+                                target_datetime=datetime(2026, 10, 16, 20, 0))
+    assert "place_relevance_retry1" in state["agent_results"]
+    assert any("more were checked" in line for line in state["adaptation_log"])
+    assert all(p["place_name"].startswith("Burger Joint") for p in state["final_recommendations"])
+
+
+def test_weak_matches_are_flagged(resources, monkeypatch):
+    use_llm(monkeypatch, _relevance_scores(lambda name: 0.65))
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want to go skiing", loc, synthesize=False)
+    assert state.get("weak_match") is True
+    use_llm(monkeypatch, _relevance_scores(lambda name: 0.9))
+    strong = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert not strong.get("weak_match")
+
+
+def test_a_city_named_in_the_request_moves_the_search(resources, monkeypatch):
+    PARIS = (48.8566, 2.3522)
+
+    def llm(system_prompt, user_message, model=None):
+        parsed, usage = nearby_llm(system_prompt, user_message, model)
+        if "Preference Agent" in system_prompt:
+            parsed = dict(parsed, city="Paris, France")
+        return parsed, usage
+
+    def osm(url, params=None, headers=None, timeout=None):
+        if "nominatim" in url and "Paris" in params["q"]:
+            return FakeResponse([{"lat": str(PARIS[0]), "lon": str(PARIS[1]), "display_name": "Paris, France", "name": "Paris"}])
+        return nearby_get(url, params, headers, timeout)
+
+    use_llm(monkeypatch, llm)
+    monkeypatch.setattr("requests.get", osm)
+    routes = []
+    original_post = nearby_post
+
+    def post(url, headers=None, json=None, timeout=None):
+        if "computeRoutes" in url:
+            routes.append(1)
+        if "places:searchText" in url and json.get("pageSize") != 1:
+            box = json["locationRestriction"]["rectangle"]
+            assert box["low"]["latitude"] < PARIS[0] < box["high"]["latitude"]  # searched around Paris
+            resp = original_post(url, headers, json, timeout)
+            for p in resp._payload["places"]:
+                p["location"] = {"latitude": PARIS[0] + (p["location"]["latitude"] - HOME[0]), "longitude": PARIS[1]}
+            return resp
+        return original_post(url, headers, json, timeout)
+
+    monkeypatch.setattr("requests.post", post)
+    monkeypatch.setattr("requests.post", post)
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "Best tacos in Paris, France", loc, synthesize=False)
+    assert state["searched_elsewhere"] == "Paris, France"
+    assert state["final_recommendations"] and not routes  # no meaningless 5,000-mile drive times
+
+
+def test_write_up_runs_as_its_own_step(resources):
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert state["final_recommendations"] and state["final_response"] is None
+    synthesize_results(state)
+    assert state["final_response"]["overall_summary"] and "synthesizer" in state["timings"]
+
+
+def test_feedback_shapes_the_next_search(resources):
     memory = create_empty_user_memory()
     fb = feedback_agent("No more movies, something more active, nothing over 15 minutes away", [])
     memory = update_memory_from_feedback(memory, fb["data"])
     assert memory["disliked_activities"] == ["movies"] and memory["max_travel_minutes"] == 15
 
-    state = run_adaptive_workflow(resources, "Something fun for two in Austin", memory=memory, city="Austin", origin="UT Austin")
-    assert not any(contains_keyword(a["activity"], "movie") for a in state["candidate_activities"])
-    ranks = [a["activity_rank"] for a in state["candidate_activities"]]
-    assert ranks == list(range(1, len(ranks) + 1))
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    first = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    rejected = first["final_recommendations"][0]["place_name"]
+    memory["rejected_places"] = [rejected]
+    second = run_pipeline(resources, "I want cheap burgers", loc, memory=memory, synthesize=False)
+    assert rejected not in {p["place_name"] for p in second["all_places"]}
+    assert "memory" in second["agents_called"]
 
 
-def test_helpers():
-    assert build_place_query("Have a barbecue with some friends", "Austin").startswith("barbecue")
-    from recommender.outings import outing_query
-    assert outing_query("Take a nap") is None
-    assert outing_query("Go to an Escape Room") == "escape room"
-    assert build_place_query("Go to a karaoke bar with some friends", "Austin") == "karaoke bar in Austin"
-    start, end = build_event_window_utc(datetime(2026, 10, 12, 19, 0), "America/Chicago")
-    assert start.hour == 21 and end.hour == 6  # 7pm CDT = 00:00 UTC, window -3h/+6h
-    assert calculate_final_recommendation_score(0.8, 0.6, None, None) == pytest.approx((0.8 * 0.4 + 0.6 * 0.25) / 0.65, rel=1e-5)
-
-
-def test_only_outings_are_discovered(resources):
-    state = run_adaptive_workflow(resources, "Something relaxing and quiet for two", city="Austin", origin=None)
-    activities = {a["activity"] for a in state["candidate_activities"]}
-    assert "Read a book" not in activities and "Learn to cook a new recipe" not in activities
-    assert all(a.get("place_query") for a in state["candidate_activities"])
-
-
-def test_specific_request_is_searched_directly(resources, monkeypatch):
-    queries = []
-    original = fake_post
-
-    def spy(url, headers=None, json=None, timeout=None):
-        if "places:searchText" in url:
-            queries.append(json["textQuery"])
-            assert "locationBias" in json  # searches are centred on the city
-        return original(url, headers, json, timeout)
-
-    monkeypatch.setattr("recommender.places.requests.post", spy)
-    state = run_adaptive_workflow(resources, "I want burgers. Please find cheap burger options",
-                                  city="Austin, TX", origin=None)
-    assert queries and all(q.startswith("cheap burger restaurant") for q in queries)
-    assert all(r["source_activity"] == "Cheap burger restaurant" for r in state["ranked_results"])
-    assert any("searched directly" in line for line in state["adaptation_log"])
-
-
-def test_far_away_venues_are_dropped(resources, monkeypatch):
-    def new_york(url, headers=None, json=None, timeout=None):
-        if "places:searchText" in url:
-            resp = fake_post(url, headers, json, timeout)
-            resp._payload["places"][0]["location"] = {"latitude": 40.77, "longitude": -73.97}  # Manhattan
-            return resp
-        return fake_post(url, headers, json, timeout)
-
-    monkeypatch.setattr("recommender.places.requests.post", new_york)
-    state = run_adaptive_workflow(resources, "Something fun for four", city="Austin", origin=None)
-    assert all(abs(p["longitude"] + 97.7) < 1 for p in state["candidate_places"])
-    assert any("outside" in line for line in state["adaptation_log"])
-
-
-def test_drive_limit_is_enforced(resources):
-    state = run_adaptive_workflow(resources, "Four of us want something fun", city="Austin",
-                                  origin="UT Austin", max_travel_minutes=10)
-    minutes = [r["traffic_minutes"] for r in state["ranked_results"]]
-    assert minutes and (all(m <= 15 for m in minutes) or len(minutes) <= 3)
-
-
-def test_ttl_cache_shares_and_skips_errors():
-    import threading, time
-    from recommender.base import ttl_cache
-
-    calls = {"n": 0}
-
-    @ttl_cache(seconds=60)
-    def slow(x):
-        calls["n"] += 1
-        time.sleep(0.2)
-        if x == "bad":
-            raise ValueError("boom")
-        return {"x": x}
-
-    threads = [threading.Thread(target=slow, args=("a",)) for _ in range(5)]
-    [t.start() for t in threads]
-    [t.join() for t in threads]
-    assert calls["n"] == 1  # five simultaneous callers, one real call
-    slow("a")["x"] = "changed"
-    assert slow("a") == {"x": "a"}  # callers get copies
-    for _ in range(2):
-        with pytest.raises(ValueError):
-            slow("bad")
-    assert calls["n"] == 3  # errors are retried, not cached
-
-
-def test_state_abbreviations_pick_the_right_city(monkeypatch):
-    from recommender.weather import geocode_city
-
-    def fake(url, params=None, headers=None, timeout=None):
-        return FakeResponse({"results": [
-            {"name": "Paris", "latitude": 48.85, "longitude": 2.35, "country": "France", "admin1": "Ile-de-France", "timezone": "Europe/Paris"},
-            {"name": "Paris", "latitude": 33.66, "longitude": -95.55, "country": "United States", "admin1": "Texas", "timezone": "America/Chicago"},
-        ]})
-
-    monkeypatch.setattr("recommender.weather.requests.get", fake)
-    assert geocode_city("Paris, TX")["admin1"] == "Texas"
-
-
-def test_split_synthesis(resources):
-    from recommender.workflow import synthesize_results
-
-    state = run_adaptive_workflow(resources, "Indoor idea for four people", city="Austin", synthesize=False)
-    assert state["final_recommendations"] and state["final_response"] is None
-    synthesize_results(state)
-    assert state["final_response"]["overall_summary"] and "synthesizer" in state["timings"]
+def test_agents_that_ran_are_never_listed_as_skipped(resources):
+    loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
+    state = run_pipeline(resources, "I want cheap burgers", loc, synthesize=False)
+    assert not set(state["agents_called"]) & set(state["agents_skipped"])

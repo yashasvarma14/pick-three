@@ -7,15 +7,12 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-import recommender.nearby as nearby
-from recommender.llm import merge_usage, run_concurrently
-from recommender.matching import calculate_final_recommendation_score
-from recommender.nearby import resolve_location
-from recommender.nearby_workflow import run_nearby_workflow
-from recommender.photos import photo_vibe_agent
-from recommender.relevance import place_activity_relevance_agent
-from test_nearby import HOME, nearby_get, nearby_llm, resources  # noqa: F401  (fixture)
-from test_pipeline import FakeResponse
+from fakes import HOME, FakeResponse, nearby_get, nearby_llm, use_llm
+from recommender import resolve_location, run_pipeline
+from recommender.agents.matching import calculate_final_recommendation_score
+from recommender.agents.photo_vibe import photo_vibe_agent
+from recommender.agents.relevance import place_activity_relevance_agent
+from recommender.core.llm import merge_usage, run_concurrently
 
 USAGE = {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120, "cost": 0.0001, "cached": False}
 SEEN = {"media": [], "vision": []}
@@ -48,17 +45,17 @@ def vision_llm(system_prompt, user_message, model=None, image_urls=None):
 
 
 @pytest.fixture
-def photo_resources(resources, monkeypatch):  # noqa: F811
+def photo_resources(resources, monkeypatch):
     SEEN["media"].clear()
     SEEN["vision"].clear()
-    monkeypatch.setattr("recommender.nearby.requests.get", photo_get)
-    monkeypatch.setattr("recommender.photos.call_llm_json", vision_llm)
+    monkeypatch.setattr("requests.get", photo_get)
+    use_llm(monkeypatch, vision_llm)
     return resources
 
 
 def test_photo_vibe_ranks_by_look_and_keeps_key_private(photo_resources):
     loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
-    state = run_nearby_workflow(photo_resources, "Cozy burger spot for a date night", loc, photo_vibe="always",
+    state = run_pipeline(photo_resources, "Cozy burger spot for a date night", loc, photo_vibe="always",
                                 target_datetime=datetime(2026, 10, 16, 20, 0), synthesize=False)
     assert not state["errors"], state["errors"]
     assert "photo_vibe" in state["agents_called"]
@@ -81,9 +78,9 @@ def test_photo_vibe_ranks_by_look_and_keeps_key_private(photo_resources):
 def test_photo_vibe_follows_the_planner(photo_resources):
     loc = resolve_location(latitude=HOME[0], longitude=HOME[1])
     # The fake planner doesn't ask for photo_vibe, so "auto" skips it: no photo costs.
-    state = run_nearby_workflow(photo_resources, "I want cheap burgers", loc, synthesize=False)
+    state = run_pipeline(photo_resources, "I want cheap burgers", loc, synthesize=False)
     assert "photo_vibe" in state["agents_skipped"] and not SEEN["media"] and not SEEN["vision"]
-    state = run_nearby_workflow(photo_resources, "I want cheap burgers", loc, synthesize=False, photo_vibe="off")
+    state = run_pipeline(photo_resources, "I want cheap burgers", loc, synthesize=False, photo_vibe="off")
     assert not SEEN["vision"]
 
 
@@ -135,7 +132,7 @@ def test_relevance_batches_in_parallel_and_survives_a_failed_batch(monkeypatch):
         return {"assessments": [{"row_id": r["row_id"], "place_activity_relevance_score": 0.1 if r["row_id"] == 0 else 0.9,
                                  "relevance_reason": "ok"} for r in rows]}, dict(USAGE)
 
-    monkeypatch.setattr("recommender.relevance.call_llm_json", llm)
+    use_llm(monkeypatch, llm)
     df = pd.DataFrame([{"place_id": f"p{i}", "place_name": f"P{i}", "source_activity": "bowling"} for i in range(10)])
     out = place_activity_relevance_agent(df, 0.6, "bowling tonight", batch_size=4)
     assert out["status"] == "success"
