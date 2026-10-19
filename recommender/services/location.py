@@ -29,7 +29,7 @@ def _geocode_free(text):
     response = requests.get(
         "https://nominatim.openstreetmap.org/search",
         params={"q": text, "format": "jsonv2", "limit": 1},
-        headers={"User-Agent": "TonightSorted/1.0 (student project; activity recommender demo)"},
+        headers={"User-Agent": "PickThree/1.0 (student project; activity recommender demo)"},
         timeout=8,
     )
     response.raise_for_status()

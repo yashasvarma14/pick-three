@@ -38,14 +38,14 @@ from recommender.services.google_places import photo_uri
 from .featured import CATEGORIES, available_categories, featured_list
 from .serialize import clean, public_result
 
-log = logging.getLogger("tonight_sorted")
+log = logging.getLogger("pick_three")
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 PHOTO_NAME = re.compile(r"^places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+$")
 
-app = FastAPI(title="Tonight, Sorted API")
+app = FastAPI(title="Pick Three API")
 app.add_middleware(
     CORSMiddleware,
-    # The deployed front end's address, e.g. https://tonight-sorted.vercel.app
+    # The deployed front end's address, e.g. https://pick-three.vercel.app
     allow_origins=[o.strip() for o in str(config.get_setting("ALLOWED_ORIGINS", "")).split(",") if o.strip()],
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],

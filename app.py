@@ -1,5 +1,5 @@
 """
-Tonight, Sorted - the Streamlit app.
+Pick Three - the original Streamlit app.
 
 Run locally:  streamlit run app.py
 
@@ -21,7 +21,7 @@ from ui.picks import render_picks
 from ui.sidebar import render_sidebar
 from ui.styles import apply_styles
 
-st.set_page_config(page_title="Tonight, Sorted", page_icon="🎟️", layout="wide")
+st.set_page_config(page_title="Pick Three", page_icon="🎟️", layout="wide")
 apply_styles()
 
 RUNS_PER_SESSION = int(config.get_setting("RUNS_PER_SESSION", 5))

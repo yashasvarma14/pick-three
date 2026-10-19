@@ -1,4 +1,4 @@
-# Tonight, Sorted: an adaptive agentic activity recommender
+# Pick Three: an agentic activity recommender
 
 **[Try the live demo →](https://YOUR-APP-NAME.streamlit.app)**
 

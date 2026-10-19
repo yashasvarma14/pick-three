@@ -1,5 +1,5 @@
 """
-Tonight, Sorted: an agentic activity recommender.
+Pick Three: an agentic activity recommender.
 
     pipeline.py   run_pipeline(): one search, start to finish (read this first)
     agents/       one file per agent, numbered in the order the pipeline uses them

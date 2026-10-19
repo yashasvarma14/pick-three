@@ -2,7 +2,7 @@
 
 import { $, esc, store } from "./util.js";
 
-const KEY = "tonight-sorted.memory";
+const KEY = "pick-three.memory";
 const GROUPS = [
   ["liked_activities", "Liked"], ["disliked_activities", "Not into"], ["liked_places", "Liked places"],
   ["rejected_places", "Skipped places"], ["positive_preferences", "More of"], ["negative_preferences", "Less of"],
