@@ -7,6 +7,11 @@ One-time setup (in a terminal, with the project's .venv):
 Deploy (re-run any time to push changes):
     python scripts/deploy_hf.py --space YOUR-HF-USERNAME/pick-three
 
+The Space is PRIVATE by default: only you, signed in to Hugging Face, can open it.
+Add --public when you want to share the link (e.g. on a resume).
+
+Nothing updates on its own: the Space only changes when you run this script again.
+
 Add --with-secrets to also copy the API keys from .streamlit/secrets.toml into the
 Space's private secrets (they're stored encrypted by Hugging Face and never uploaded
 as a file). Without it, add them by hand: Space -> Settings -> Variables and secrets.
@@ -46,7 +51,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--space", required=True, help="USERNAME/space-name, e.g. yashas/pick-three")
     parser.add_argument("--with-secrets", action="store_true", help="copy API keys from .streamlit/secrets.toml")
-    parser.add_argument("--private", action="store_true", help="make the Space private (portfolio: leave public)")
+    parser.add_argument("--public", action="store_true", help="make the Space public (default: private)")
     args = parser.parse_args()
 
     api = HfApi()
@@ -56,8 +61,11 @@ def main():
         sys.exit("Not logged in to Hugging Face. Run:  hf auth login   (needs a token with write access)")
     print(f"Logged in as {user}")
 
-    api.create_repo(args.space, repo_type="space", space_sdk="docker", private=args.private, exist_ok=True)
-    print(f"Space ready: https://huggingface.co/spaces/{args.space}")
+    api.create_repo(args.space, repo_type="space", space_sdk="docker", private=not args.public, exist_ok=True)
+    # Applies to an existing Space too, so the visibility always matches what you asked for.
+    api.update_repo_settings(args.space, repo_type="space", private=not args.public)
+    print(f"Space ready ({'public' if args.public else 'private: only you can see it'}): "
+          f"https://huggingface.co/spaces/{args.space}")
 
     if args.with_secrets:
         found = local_secrets()
@@ -86,6 +94,8 @@ def main():
     print("\nDone. Hugging Face is building the image now (first build takes ~5-10 minutes).")
     print(f"  Build logs: https://huggingface.co/spaces/{args.space}?logs=build")
     print(f"  Live site:  https://{owner.lower()}-{name.lower().replace('_', '-')}.hf.space")
+    if not args.public:
+        print("  (Private: open it while signed in to huggingface.co. Re-run with --public to share it.)")
 
 
 if __name__ == "__main__":

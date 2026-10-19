@@ -64,7 +64,7 @@ The whole search is one function, `run_pipeline()` in [`recommender/pipeline.py`
 ```bash
 git clone https://github.com/YOUR-USERNAME/pick-three.git
 cd pick-three
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scriptsctivate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .streamlit/secrets.toml.example .streamlit/secrets.toml   # then add your keys
@@ -102,6 +102,8 @@ The `Dockerfile` runs the API and the website together in one container. Hugging
    `--with-secrets` copies the keys from `.streamlit/secrets.toml` into the Space's encrypted secrets;
    the file itself is never uploaded. Without it, add them under Space → Settings → Variables and secrets.
 4. The first build takes 5–10 minutes. The site is then at `https://YOUR-HF-USERNAME-pick-three.hf.space`.
+   The Space is **private** by default (only you, signed in, can see it); add `--public` to share it.
+   It only changes when you run the script again; nothing redeploys on its own.
 
 Free Spaces sleep after a while without visitors, so nothing runs (or costs anything) when nobody is using it.
 The first visit after a nap takes about a minute to wake up.
