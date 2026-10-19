@@ -98,7 +98,7 @@ function scoreBars(p) {
 }
 
 function pickCard(p, rank, writeup) {
-  const photos = (p.photo_names || []).slice(0, 3);
+  const photos = (p.photo_names || []).slice(0, 2);  // each photo shown is a billed Google download
   const why = writeup?.why_it_fits || p.rag_evidence_summary;
   const caveat = writeup?.important_caveat;
   const type = [p.primary_type, p.source_activity ? `found by searching “${p.source_activity}”` : ""].filter(Boolean).join(" · ");

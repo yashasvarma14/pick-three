@@ -306,8 +306,9 @@ def run_pipeline(
                                               request_text=user_prompt, max_bars=4))
 
     head = pick_shortlist(scored)
-    # Reviews cost more on Google's price list, so only the likely top 8.
-    detail_futures = {pid: pool.submit(safe_place_details, pid) for pid in head["place_id"].head(travel_n)}
+    # Reviews are the priciest Google call, so only for the likely finalists.
+    reviews_n = settings["reviews_for_top"]
+    detail_futures = {pid: pool.submit(safe_place_details, pid) for pid in head["place_id"].head(reviews_n)}
     prefetch_websites(head, pool)
 
     def start_travel_times(df):
@@ -402,7 +403,7 @@ def run_pipeline(
     # ======================================================================
     notify("venue_rag", "Reading Google reviews and venue websites")
     details = {pid: (detail_futures[pid].result() if pid in detail_futures else safe_place_details(pid))
-               for pid in finalists["place_id"]}
+               for pid in finalists["place_id"].head(reviews_n)}
     finalists = finalists.copy()
     finalists["editorial_summary"] = finalists["place_id"].map(lambda p: details.get(p, {}).get("editorial_summary"))
     finalists["google_reviews"] = finalists["place_id"].map(lambda p: details.get(p, {}).get("reviews", []))

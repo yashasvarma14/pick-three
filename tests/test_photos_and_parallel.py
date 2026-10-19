@@ -59,9 +59,9 @@ def test_photo_vibe_ranks_by_look_and_keeps_key_private(photo_resources):
                                 target_datetime=datetime(2026, 10, 16, 20, 0), synthesize=False)
     assert not state["errors"], state["errors"]
     assert "photo_vibe" in state["agents_called"]
-    # 3 photos per venue, at most 5 venues, every one through the media endpoint.
-    assert SEEN["vision"] and all(len(urls) == 3 for urls in SEEN["vision"]) and len(SEEN["vision"]) <= 5
-    assert state["usage"]["api_calls"]["google_place_photos"] == 3 * len(SEEN["vision"])
+    # 2 photos per venue (photos_per_place), at most 5 venues, every one through the media endpoint.
+    assert SEEN["vision"] and all(len(urls) == 2 for urls in SEEN["vision"]) and len(SEEN["vision"]) <= 5
+    assert state["usage"]["api_calls"]["google_place_photos"] == 2 * len(SEEN["vision"])
     # The model only ever sees public links, never the Google key.
     assert all("key=" not in u and "test" not in u for urls in SEEN["vision"] for u in urls)
     assert all(params["skipHttpRedirect"] == "true" for _, params, _ in SEEN["media"])

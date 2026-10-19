@@ -3,9 +3,17 @@
 
 Each list is one Google Maps search around downtown Austin, ranked by the
 same review-adjusted rating the recommender uses (a 5.0 from 12 reviews
-doesn't beat a 4.7 from 3,000). Lists are cached for 12 hours, so the home
-page costs one Google search per category twice a day, not one per visitor.
+doesn't beat a 4.7 from 3,000).
+
+To keep a portfolio site free to leave running, the lists come from a
+snapshot file (web/data/featured.json) made by scripts/build_featured.py,
+not from Google on every visit. Re-run that script when you want fresh
+lists (Google's terms ask that place details not be kept for long, so
+about once a month). Set FEATURED_LIVE=1 to fetch live instead.
 """
+
+import json
+from pathlib import Path
 
 from datetime import datetime, timedelta, timezone
 
@@ -18,6 +26,8 @@ from recommender.core import config
 from recommender.core.cache import ttl_cache
 from recommender.services.google_places import search_area_phrase
 from recommender.services.ticketmaster import normalize_event_result, search_events
+
+SNAPSHOT = Path(__file__).resolve().parent.parent / "web" / "data" / "featured.json"
 
 AUSTIN = {"latitude": 30.2672, "longitude": -97.7431, "label": "Austin, TX", "timezone": "America/Chicago"}
 RADIUS_KM = 12  # downtown plus the close-in neighborhoods
@@ -60,9 +70,33 @@ def top_places(raw_places, n=10, min_reviews=150):
     return [{k: row.get(k) for k in ITEM_FIELDS} | {"rank": i} for i, row in enumerate(picked, start=1)]
 
 
-@ttl_cache(seconds=12 * 60 * 60, maxsize=32)
+def load_snapshot():
+    try:
+        return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def available_categories():
+    """Categories the home page can show right now (snapshot first)."""
+    snapshot = load_snapshot()
+    if snapshot and not config.get_setting("FEATURED_LIVE"):
+        return [{"id": key, "label": value["label"]} for key, value in snapshot["lists"].items() if value["items"]]
+    has_events = bool(config.ticketmaster_api_key())
+    return [{"id": key, "label": spec["label"]} for key, spec in CATEGORIES.items() if spec["search"] or has_events]
+
+
 def featured_list(category):
-    """The top-10 list for one category (cached 12 hours)."""
+    """The top-10 list for one category: from the snapshot, or live if there isn't one."""
+    snapshot = load_snapshot()
+    if snapshot and not config.get_setting("FEATURED_LIVE"):
+        return snapshot["lists"].get(category, {}).get("items", [])
+    return live_list(category)
+
+
+@ttl_cache(seconds=12 * 60 * 60, maxsize=32)
+def live_list(category):
+    """Fetch one list from Google now (cached 12 hours). Used by the snapshot script."""
     spec = CATEGORIES[category]
     if spec["search"] is None:
         return upcoming_events()

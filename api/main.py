@@ -15,6 +15,7 @@ Endpoints
 """
 
 import json
+import logging
 import queue
 import re
 import threading
@@ -34,9 +35,10 @@ from recommender.agents.memory import LIST_FIELDS
 from recommender.core import config
 from recommender.services.google_places import photo_uri
 
-from .featured import CATEGORIES, featured_list
+from .featured import CATEGORIES, available_categories, featured_list
 from .serialize import clean, public_result
 
+log = logging.getLogger("tonight_sorted")
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 PHOTO_NAME = re.compile(r"^places/[A-Za-z0-9_-]+/photos/[A-Za-z0-9_-]+$")
 
@@ -65,11 +67,17 @@ def get_resources():
     return _resources
 
 
+# Load the model in the background as soon as the server starts, so the first
+# visitor doesn't wait ~10 s (and two requests never load it at the same time).
+threading.Thread(target=get_resources, daemon=True).start()
+
+
 RECENT_RUNS = OrderedDict()  # run_id -> state, so /api/writeup can finish a search
 MAX_RECENT_RUNS = 100
 
-RUNS_PER_VISITOR = int(config.get_setting("RUNS_PER_VISITOR_PER_DAY", 15))
-RUNS_PER_DAY = int(config.get_setting("RUNS_PER_DAY", 150))
+# Hard caps so a public portfolio demo can't run up a bill.
+RUNS_PER_VISITOR = int(config.get_setting("RUNS_PER_VISITOR_PER_DAY", 5))
+RUNS_PER_DAY = int(config.get_setting("RUNS_PER_DAY", 30))
 _usage = {"date": date.today(), "total": 0, "by_visitor": {}}
 _usage_lock = threading.Lock()
 
@@ -157,9 +165,7 @@ def locate(where):
 @app.get("/api/config")
 def get_config():
     status = config.api_status()
-    categories = [{"id": key, "label": spec["label"]} for key, spec in CATEGORIES.items()
-                  if spec["search"] or status["ticketmaster"]]
-    return {"ready": status["llm"] and status["google_maps"], "categories": categories,
+    return {"ready": status["llm"] and status["google_maps"], "categories": available_categories(),
             "searches_per_day": RUNS_PER_VISITOR}
 
 
@@ -167,8 +173,6 @@ def get_config():
 def get_featured(category: str):
     if category not in CATEGORIES:
         raise HTTPException(404, "Unknown category.")
-    if not config.google_maps_api_key():
-        raise HTTPException(503, "Google Maps isn't configured.")
     try:
         items = featured_list(category)
     except Exception as exc:
@@ -186,7 +190,8 @@ def get_photo(name: str, w: int = 640):
         raise HTTPException(404, "Photo unavailable.")
     if not url:
         raise HTTPException(404, "Photo unavailable.")
-    return RedirectResponse(url, status_code=302, headers={"Cache-Control": "public, max-age=3000"})
+    # The browser keeps the redirect for a day, so a returning visitor costs nothing.
+    return RedirectResponse(url, status_code=302, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.post("/api/locate")
@@ -214,6 +219,8 @@ def post_search(body: SearchBody, request: Request):
 
     def work():
         try:
+            if _resources is None:
+                progress("warmup", "Waking up the server (first search after a quiet spell)")
             state = run_pipeline(get_resources(), body.prompt.strip(), location,
                                  memory=clean_memory(body.memory),
                                  target_datetime=body.when.replace(tzinfo=None) if body.when else None,
@@ -224,6 +231,7 @@ def post_search(body: SearchBody, request: Request):
                 RECENT_RUNS.popitem(last=False)
             events.put({"type": "result", "result": public_result(state), "searches_left": searches_left})
         except Exception as exc:
+            log.exception("Search failed")  # full traceback in the server log, short message for the visitor
             events.put({"type": "error", "message": f"Something went wrong ({type(exc).__name__}). Try again?"})
         finally:
             events.put(None)

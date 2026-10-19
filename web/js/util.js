@@ -34,6 +34,7 @@ export function price(level) {
 
 // Friendly names for the pipeline steps (keys match recommender/pipeline.py).
 export const STEP_LABELS = {
+  warmup: "Warming up",
   orchestrator: "Planning which agents to use",
   preference: "Reading your request",
   memory: "Using what you told me before",

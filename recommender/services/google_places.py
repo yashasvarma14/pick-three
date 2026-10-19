@@ -166,7 +166,7 @@ def safe_place_details(place_id):
         return {"editorial_summary": None, "reviews": [], "photos": []}
 
 
-@ttl_cache(seconds=60 * 60, maxsize=512)
+@ttl_cache(seconds=6 * 60 * 60, maxsize=2048)
 def photo_uri(photo_name, max_width=640):
     """
     Public image URL for one Place photo. skipHttpRedirect returns the

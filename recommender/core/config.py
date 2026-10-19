@@ -28,7 +28,9 @@ def get_setting(name, default=None):
         pass
 
     value = os.environ.get(name)
-    return value if value not in (None, "") else default
+    if value in (None, "") or value.endswith("..."):
+        return default
+    return value
 
 
 def anthropic_api_key():
@@ -82,7 +84,7 @@ DEFAULTS = {
     # Searching
     "top_n_activities": 10,        # catalog ideas Discovery ranks
     "catalog_ideas": 1,            # catalog ideas added as searches for open-ended requests
-    "max_searches": 4,             # Google searches per run (each uses daily quota)
+    "max_searches": 3,             # Google searches per run (the priciest call: keep it low)
     "search_pages": 1,             # 20 places per page; "Search deeper" uses 3
     # Shortlist + venue check
     "shortlist_for_relevance": 12,
@@ -90,12 +92,13 @@ DEFAULTS = {
     "min_usable_places": 6,        # fewer than this after the check -> check the next batch
     "relevance_retries": 1,
     # Finalists
-    "shortlist_for_travel": 8,     # drive times + reviews for this many
+    "shortlist_for_travel": 8,     # drive times for this many
+    "reviews_for_top": 5,          # Google reviews + photo references for this many (= what the RAG reads)
     "rag_max_places": 5,
     "rag_top_k_chunks": 10,
     "photo_vibe": "auto",          # "auto" follows the planner, or "always" / "off"
     "photo_max_places": 5,
-    "photos_per_place": 3,
+    "photos_per_place": 2,         # each photo the vision model looks at is a billed download
     # Results
     "final_recommendations": 3,
     "strong_match_score": 0.75,    # best pick's venue-check score below this -> "no strong match" note
