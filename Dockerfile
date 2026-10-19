@@ -1,12 +1,13 @@
-# Pick Three on Hugging Face Spaces (Docker Space).
-# One container serves both the API and the website on port 7860.
+# Pick Three on Google Cloud Run.
+# One container serves both the API and the website, on the port Cloud Run gives it ($PORT).
 FROM python:3.12-slim
 
+# HF_HOME is where the embedding model gets stored inside the image.
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     HF_HOME=/home/user/.cache/huggingface
 
-# Spaces run containers as user 1000.
+# Run as a regular user, not root.
 RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
 
@@ -19,5 +20,5 @@ RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTr
 
 COPY --chown=user . .
 
-EXPOSE 7860
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "7860", "--proxy-headers", "--forwarded-allow-ips", "*"]
+EXPOSE 8080
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips '*'"]

@@ -89,24 +89,27 @@ python scripts/build_catalog.py path/to/activity.json
 
 Weather uses Open-Meteo, which needs no key. The Photo Vibe agent uses the same Google key (Places API (New) photos) and needs a vision-capable `LLM_MODEL` (every current Claude model is); set `photo_vibe` to `"off"` in `recommender/config.py` to turn it off.
 
-## Deploy (Hugging Face Spaces, free)
+## Deploy (Google Cloud Run)
 
-The `Dockerfile` runs the API and the website together in one container. Hugging Face builds it.
+The `Dockerfile` runs the API and the website together in one container. Cloud Run builds and hosts it,
+scales to zero when nobody is using it (nothing runs, nothing is billed), and its free tier covers
+thousands of searches a month.
 
-1. Create a free account at huggingface.co and a token with **write** access (Settings → Access Tokens).
-2. Log in once: `hf auth login`
-3. Deploy (re-run to push updates):
+1. Install the Google Cloud CLI: `winget install Google.CloudSDK` (then open a new terminal).
+2. Log in and pick the project that has your Maps key:
    ```bash
-   python scripts/deploy_hf.py --space YOUR-HF-USERNAME/pick-three --with-secrets
+   gcloud auth login
+   gcloud config set project YOUR-PROJECT-ID
    ```
-   `--with-secrets` copies the keys from `.streamlit/secrets.toml` into the Space's encrypted secrets;
-   the file itself is never uploaded. Without it, add them under Space → Settings → Variables and secrets.
-4. The first build takes 5–10 minutes. The site is then at `https://YOUR-HF-USERNAME-pick-three.hf.space`.
-   The Space is **private** by default (only you, signed in, can see it); add `--public` to share it.
-   It only changes when you run the script again; nothing redeploys on its own.
-
-Free Spaces sleep after a while without visitors, so nothing runs (or costs anything) when nobody is using it.
-The first visit after a nap takes about a minute to wake up.
+3. Deploy (re-run to push updates; nothing redeploys on its own):
+   ```bash
+   python scripts/deploy_cloudrun.py
+   ```
+   Your keys are copied from `.streamlit/secrets.toml` into the service's settings; the file itself is
+   never uploaded (`.gcloudignore`).
+4. It's **private** by default: only your Google account can open it, via
+   `gcloud run services proxy pick-three --region us-central1 --port 8080` and then http://localhost:8080.
+   Run `python scripts/deploy_cloudrun.py --public` to give it a shareable link.
 
 ### Keeping a public demo affordable
 

@@ -13,7 +13,7 @@ Done and tested in the browser
 
 To do
 - API tests (tests/test_api.py) with the fakes in tests/fakes.py
-- Deployment: Dockerfile for Hugging Face Spaces (backend + site together is simplest)
+- Deployment: `python scripts/deploy_cloudrun.py` (Google Cloud Run, private by default; see README)
 - Google Cloud: per-day quota caps on Places + Routes, and a $1 budget alert
 - Remove the old Streamlit `app.py` + `ui/` once happy with the website; update README
 - Visual polish pass on phone sizes

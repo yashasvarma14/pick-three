@@ -1,0 +1,18 @@
+# Never ship local keys
+.streamlit/secrets.toml
+.env
+# Not needed in the image
+.venv/
+.git/
+.claude/
+notebooks/
+tests/
+docs/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# gcloud only
+.git
+.gitignore
+.gcloudignore
