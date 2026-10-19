@@ -424,14 +424,6 @@ button { transition: transform var(--fast) var(--ease), background-color var(--b
 .stat-strip b { display: block; font-size: 26px; font-weight: 600; letter-spacing: -.03em; color: var(--accent); }
 .stat-strip span { font-size: 13px; color: var(--muted); }
 
-/* One color per discipline: shown once in the legend, then as a dot on each method. */
-.legend { list-style: none; margin: 0 0 30px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13.5px; color: var(--ink-2); }
-.legend li { display: inline-flex; align-items: center; gap: 8px; }
-.dot-k { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
-.k-stat { --k: #ff5a36; } .k-nlp { --k: #2b6cff; } .k-rag { --k: #7a5af8; }
-.k-vision { --k: #d97706; } .k-llm { --k: #111111; } .k-eng { --k: #1f9d55; }
-.dot-k { background: var(--k); }
-
 /* The pathway: stages down a line, the methods used at each stage beside it. */
 .pathway { list-style: none; margin: 0; padding: 0; position: relative; display: grid; gap: 28px; }
 /* The connecting line: one segment from each node down to the next, none after the last. */
@@ -452,9 +444,8 @@ button { transition: transform var(--fast) var(--ease), background-color var(--b
 .tech { border: 1px solid var(--hairline); border-radius: 12px; padding: 13px 14px; background: var(--bg); display: flex;
         flex-direction: column; gap: 5px;
         transition: transform var(--base) var(--ease), box-shadow var(--base) var(--ease), border-color var(--base) var(--ease); }
-.tech:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--k) 35%, var(--hairline)); }
-.tech b { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
-.tech b::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 3px; background: var(--k); }
+.tech:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: #dcdcd9; }
+.tech b { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
 .tech p { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
 .tech code { margin-top: auto; display: block; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink);
              background: var(--surface); border-radius: 8px; padding: 7px 9px; }

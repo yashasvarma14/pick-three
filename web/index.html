@@ -205,71 +205,61 @@
         <div><b>43</b><span>automated tests, run offline against mocked APIs</span></div>
       </div>
 
-      <!-- Legend: each discipline appears once; methods below carry its color. -->
-      <ul class="legend reveal" aria-label="Methods by discipline">
-        <li><span class="dot-k k-stat"></span>Statistics</li>
-        <li><span class="dot-k k-nlp"></span>NLP &amp; embeddings</li>
-        <li><span class="dot-k k-rag"></span>Retrieval (RAG)</li>
-        <li><span class="dot-k k-vision"></span>Computer vision</li>
-        <li><span class="dot-k k-llm"></span>LLM engineering</li>
-        <li><span class="dot-k k-eng"></span>Software engineering</li>
-      </ul>
-
       <!-- The pathway: what happens at each stage of a search, and the method behind it. -->
       <ol class="pathway">
         <li class="stage reveal">
           <div class="stage-head"><span class="node">1</span><div><h3>Plan</h3><p>Read the request, decide which agents to run.</p></div></div>
           <div class="techs">
-            <div class="tech k-llm"><b>Planner with a checked plan</b><p>The LLM proposes agents; Python enforces a dependency graph and a call budget.</p></div>
-            <div class="tech k-llm"><b>Request → structured JSON</b><p>Group size, budget, likes, dislikes, a time ("this afternoon") and map searches.</p></div>
-            <div class="tech k-eng"><b>Head start</b><p>Weather and events start in background threads right away.</p></div>
+            <div class="tech"><b>Planner with a checked plan</b><p>The LLM proposes agents; Python enforces a dependency graph and a call budget.</p></div>
+            <div class="tech"><b>Request → structured JSON</b><p>Group size, budget, likes, dislikes, a time ("this afternoon") and map searches.</p></div>
+            <div class="tech"><b>Head start</b><p>Weather and events start in background threads right away.</p></div>
           </div>
         </li>
         <li class="stage reveal">
           <div class="stage-head"><span class="node">2</span><div><h3>Search</h3><p>Find real places around you.</p></div></div>
           <div class="techs">
-            <div class="tech k-eng"><b>Boxed Google Maps searches</b><p>Several searches at once, limited to a box sized from your drive time.</p></div>
-            <div class="tech k-nlp"><b>Catalog ideas by meaning</b><p>For open-ended requests, outings from a 196-activity dataset ranked by embedding similarity.</p>
+            <div class="tech"><b>Boxed Google Maps searches</b><p>Several searches at once, limited to a box sized from your drive time.</p></div>
+            <div class="tech"><b>Catalog ideas by meaning</b><p>For open-ended requests, outings from a 196-activity dataset ranked by embedding similarity.</p>
               <code>0.70 semantic + 0.15 group + 0.10 budget + 0.05 category</code></div>
-            <div class="tech k-eng"><b>Polite retries</b><p>On "too many requests", wait 1, 2, 4, 8 s plus jitter.</p></div>
+            <div class="tech"><b>Polite retries</b><p>On "too many requests", wait 1, 2, 4, 8 s plus jitter.</p></div>
           </div>
         </li>
         <li class="stage reveal">
           <div class="stage-head"><span class="node">3</span><div><h3>Score</h3><p>Rank every place found, 50–75 of them, with plain math.</p></div></div>
           <div class="techs">
-            <div class="tech k-nlp"><b>Fit by cosine similarity</b><p>all-MiniLM-L6-v2 embeddings of the request vs. each place.</p>
+            <div class="tech"><b>Fit by cosine similarity</b><p>all-MiniLM-L6-v2 embeddings of the request vs. each place.</p>
               <code>sim(q,p) = q·p / (‖q‖‖p‖), rescaled to 0.3–1.0</code></div>
-            <div class="tech k-stat"><b>Bayesian-adjusted rating</b><p>A 5.0 from 12 reviews shouldn't beat a 4.7 from 3,000.</p>
+            <div class="tech"><b>Bayesian-adjusted rating</b><p>A 5.0 from 12 reviews shouldn't beat a 4.7 from 3,000.</p>
               <code>(v·r + m·C) / (v + m), m = 40, C = median ≤ 4.4</code></div>
-            <div class="tech k-stat"><b>Weighted pre-score + weather</b><p>Outdoor places are discounted when the forecast is bad.</p>
+            <div class="tech"><b>Weighted pre-score + weather</b><p>Outdoor places are discounted when the forecast is bad.</p>
               <code>0.45 fit + 0.25 quality + 0.20 near + 0.10 open</code></div>
-            <div class="tech k-eng"><b>Entity resolution</b><p>Duplicate listings and chain branches merged by name tokens, website and distance.</p></div>
+            <div class="tech"><b>Entity resolution</b><p>Duplicate listings and chain branches merged by name tokens, website and distance.</p></div>
           </div>
         </li>
         <li class="stage reveal">
           <div class="stage-head"><span class="node">4</span><div><h3>Check</h3><p>Look closer at the best dozen.</p></div></div>
           <div class="techs">
-            <div class="tech k-llm"><b>LLM validator</b><p>Drops places that only sound related; batches of 4 checked in parallel.</p>
+            <div class="tech"><b>LLM validator</b><p>Drops places that only sound related; batches of 4 checked in parallel.</p>
               <code>keep if relevance ≥ 0.60, else check the next batch</code></div>
-            <div class="tech k-eng"><b>Live traffic + opening hours</b><p>Google Routes drive times; weekly hours turned into minute-of-week intervals.</p></div>
+            <div class="tech"><b>Live traffic + opening hours</b><p>Google Routes drive times; weekly hours turned into minute-of-week intervals.</p></div>
           </div>
         </li>
         <li class="stage reveal">
           <div class="stage-head"><span class="node">5</span><div><h3>Evidence</h3><p>Read and look at the finalists, both at the same time.</p></div></div>
           <div class="techs">
-            <div class="tech k-rag"><b>Reviews + website RAG</b><p>Scrape, chunk, embed, retrieve; the LLM judges from those passages only.</p>
+            <div class="tech"><b>Reviews + website RAG</b><p>Scrape, chunk, embed, retrieve; the LLM judges from those passages only.</p>
               <code>700-char chunks, 120 overlap, coverage-aware top-k</code></div>
-            <div class="tech k-vision"><b>Photo vibe</b><p>A vision model rates the atmosphere in Google Maps photos when the look matters.</p>
+            <div class="tech"><b>Photo vibe</b><p>A vision model rates the atmosphere in Google Maps photos when the look matters.</p>
               <code>vibe ∈ [0, 1], 0.5 if unclear</code></div>
           </div>
         </li>
         <li class="stage reveal">
           <div class="stage-head"><span class="node">6</span><div><h3>Rank &amp; explain</h3><p>Pick three and say why.</p></div></div>
           <div class="techs">
-            <div class="tech k-stat"><b>Re-normalized weights</b><p>A missing signal is dropped, never filled in with a guess.</p>
+            <div class="tech"><b>Re-normalized weights</b><p>A missing signal is dropped, never filled in with a guess.</p>
               <code>Σ wᵢsᵢ / Σ wᵢ, w = 40 · 25 · 15 · 20 · 15</code></div>
-            <div class="tech k-eng"><b>Greedy diverse picks</b><p>No two of one business, a cap per kind of place.</p></div>
-            <div class="tech k-llm"><b>Grounded write-up</b><p>Must return the exact ranking or it's rejected.</p></div>
+            <div class="tech"><b>Greedy diverse picks</b><p>No two of one business, a cap per kind of place.</p></div>
+            <div class="tech"><b>Grounded write-up</b><p>Must return the exact ranking or it's rejected.</p></div>
           </div>
         </li>
         <li class="stage stage-end reveal">
