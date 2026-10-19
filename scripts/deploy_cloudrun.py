@@ -12,6 +12,7 @@ Deploy (re-run any time to push changes):
 
 What it does
   * enables Cloud Run, Cloud Build and Artifact Registry in your project
+  * gives the project's build account the "Cloud Run Builder" role (new projects need this)
   * builds the Dockerfile on Google's servers and deploys it as the "pick-three" service
   * copies your API keys from .streamlit/secrets.toml into the service's settings
     (through a temporary file that is deleted right after; the secrets file itself is
@@ -93,6 +94,15 @@ def main():
 
     print("Enabling Cloud Run, Cloud Build and Artifact Registry (first time only takes a minute)...")
     run(["services", "enable", "run.googleapis.com", "cloudbuild.googleapis.com", "artifactregistry.googleapis.com"])
+
+    # New projects build with the default compute account, which no longer gets the permissions
+    # it needs (read the uploaded code, push the image, write logs). "Cloud Run Builder" is the
+    # narrow role Google recommends for exactly that. Safe to repeat.
+    number = run(["projects", "describe", project, "--format=value(projectNumber)"], capture=True)
+    print("Making sure the build account can build (Cloud Run Builder role)...")
+    run(["projects", "add-iam-policy-binding", project,
+         f"--member=serviceAccount:{number}-compute@developer.gserviceaccount.com",
+         "--role=roles/run.builder", "--condition=None", "--quiet"], capture=True)
 
     # Keys go in a temporary file so they never show up on a command line or in the terminal.
     fd, env_file = tempfile.mkstemp(suffix=".yaml")
