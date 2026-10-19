@@ -83,6 +83,10 @@ def main():
     print(f"Account: {account}\nProject: {project}")
 
     settings = local_settings()
+    if not args.public:
+        # Only you can reach a private deploy, so give yourself room to try it out.
+        settings.setdefault("RUNS_PER_VISITOR_PER_DAY", "50")
+        settings.setdefault("RUNS_PER_DAY", "50")
     missing = [k for k in ["ANTHROPIC_API_KEY", "GOOGLE_MAPS_API_KEY"] if k not in settings]
     if missing:
         sys.exit(f"Missing in .streamlit/secrets.toml: {', '.join(missing)}")

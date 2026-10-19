@@ -16,6 +16,7 @@ Endpoints
 
 import json
 import logging
+import os
 import queue
 import re
 import threading
@@ -69,7 +70,8 @@ def get_resources():
 
 # Load the model in the background as soon as the server starts, so the first
 # visitor doesn't wait ~10 s (and two requests never load it at the same time).
-threading.Thread(target=get_resources, daemon=True).start()
+if not os.environ.get("PICK_THREE_NO_WARMUP"):  # the tests set this and use a fake model
+    threading.Thread(target=get_resources, daemon=True).start()
 
 
 RECENT_RUNS = OrderedDict()  # run_id -> state, so /api/writeup can finish a search
@@ -82,9 +84,20 @@ _usage = {"date": date.today(), "total": 0, "by_visitor": {}}
 _usage_lock = threading.Lock()
 
 
+# Cloud Run sets K_SERVICE. Without it we're running on your own machine, where the
+# daily limit doesn't apply. (Deciding this from an address would be spoofable.)
+RUNNING_LOCALLY = not os.environ.get("K_SERVICE")
+
+
 def visitor_id(request):
+    """
+    The visitor's IP. Google's proxy appends the real address to the END of
+    X-Forwarded-For; anything earlier was sent by the browser and can be faked.
+    """
     forwarded = request.headers.get("x-forwarded-for")
-    return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def take_a_search(visitor):
@@ -209,7 +222,7 @@ def post_search(body: SearchBody, request: Request):
         {"type": "error", "message": "..."}
     """
     location = locate(body.where)
-    searches_left = take_a_search(visitor_id(request))
+    searches_left = None if RUNNING_LOCALLY else take_a_search(visitor_id(request))
     events = queue.Queue()
     started = datetime.now()
 
