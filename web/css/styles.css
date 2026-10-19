@@ -87,13 +87,8 @@ button { transition: transform var(--fast) var(--ease), background-color var(--b
   border-bottom: 1px solid transparent;
   transition: background-color var(--base) var(--ease), border-color var(--base) var(--ease);
 }
-/* Frosted glass once the page scrolls under it. */
-.topbar.scrolled {
-  background: rgba(255, 255, 255, .72);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  backdrop-filter: saturate(180%) blur(16px);
-  border-bottom-color: var(--hairline);
-}
+/* Solid white with a hairline once the page scrolls under it. */
+.topbar.scrolled { background: var(--bg); border-bottom-color: var(--hairline); }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -.02em; text-decoration: none; }
 .brand-mark { width: 22px; height: 22px; border-radius: 7px; background: var(--ink); position: relative; }
 .brand-mark::after { content: ""; position: absolute; width: 7px; height: 7px; border-radius: 50%;
@@ -429,33 +424,47 @@ button { transition: transform var(--fast) var(--ease), background-color var(--b
 .stat-strip b { display: block; font-size: 26px; font-weight: 600; letter-spacing: -.03em; color: var(--accent); }
 .stat-strip span { font-size: 13px; color: var(--muted); }
 
-/* The pipeline as a row of numbered steps joined by a line. */
-.flow { list-style: none; margin: 0 0 36px; padding: 0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; position: relative; }
-.flow::before { content: ""; position: absolute; top: 15px; left: 16px; right: 16px; height: 1px; background: var(--hairline); }
-.flow li { position: relative; display: grid; gap: 2px; }
-.flow span { width: 30px; height: 30px; border-radius: 9px; background: var(--bg); border: 1px solid var(--hairline); display: grid;
-             place-items: center; font-size: 13px; font-weight: 600; margin-bottom: 8px; transition: all var(--base) var(--ease); }
-.flow li:hover span { background: var(--accent); border-color: var(--accent); color: #fff; }
-.flow b { font-size: 15px; font-weight: 600; }
-.flow small { font-size: 13px; color: var(--muted); line-height: 1.4; }
+/* One color per discipline: shown once in the legend, then as a dot on each method. */
+.legend { list-style: none; margin: 0 0 30px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13.5px; color: var(--ink-2); }
+.legend li { display: inline-flex; align-items: center; gap: 8px; }
+.dot-k { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.k-stat { --k: #ff5a36; } .k-nlp { --k: #2b6cff; } .k-rag { --k: #7a5af8; }
+.k-vision { --k: #d97706; } .k-llm { --k: #111111; } .k-eng { --k: #1f9d55; }
+.dot-k { background: var(--k); }
 
-.methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.method { border: 1px solid var(--hairline); border-radius: var(--radius); padding: 22px; background: var(--bg); display: flex;
-          flex-direction: column; gap: 8px; transition: box-shadow var(--base) var(--ease), transform var(--base) var(--ease),
-          border-color var(--base) var(--ease); }
-.method:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: #dcdcd9; }
-.method .method-tag { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
-.method h3 { font-size: 18px; letter-spacing: -.02em; }
-.method p { color: var(--ink-2); font-size: 14.5px; line-height: 1.55; }
-.formula { margin-top: auto; display: block; font: 13px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink);
-           background: var(--surface); border-radius: var(--radius-sm); padding: 10px 12px; }
-.formula i { font-style: normal; color: var(--muted); font-size: 12px; }
-.formula sub { font-size: .75em; }
+/* The pathway: stages down a line, the methods used at each stage beside it. */
+.pathway { list-style: none; margin: 0; padding: 0; position: relative; display: grid; gap: 28px; }
+/* The connecting line: one segment from each node down to the next, none after the last. */
+.stage:not(:last-child)::before { content: ""; position: absolute; left: 15px; top: 31px; bottom: -28px; width: 1px;
+                                  background: var(--hairline); }
+.stage { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; position: relative; }
+.stage-head { display: flex; gap: 14px; align-items: flex-start; }
+.node { position: relative; z-index: 1; flex: none; width: 31px; height: 31px; border-radius: 9px; background: var(--bg);
+        border: 1px solid var(--hairline); display: grid; place-items: center; font-size: 13px; font-weight: 600;
+        transition: background-color var(--base) var(--ease), border-color var(--base) var(--ease), color var(--base) var(--ease); }
+.stage:hover .node { background: var(--accent); border-color: var(--accent); color: #fff; }
+.node.end { background: var(--ink); border-color: var(--ink); }
+.node.end::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.stage-head h3 { font-size: 18px; margin-top: 3px; }
+.stage-head p { font-size: 14px; color: var(--muted); margin-top: 2px; }
 
-.stack { margin-top: 28px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.stack-title { font-size: 13px; color: var(--muted); font-weight: 500; }
-.stack-items { display: flex; gap: 8px; flex-wrap: wrap; }
-.stack-items span { font-size: 13px; border: 1px solid var(--hairline); border-radius: var(--r-tag); padding: 5px 10px; color: var(--ink-2); }
+.techs { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.tech { border: 1px solid var(--hairline); border-radius: 12px; padding: 13px 14px; background: var(--bg); display: flex;
+        flex-direction: column; gap: 5px;
+        transition: transform var(--base) var(--ease), box-shadow var(--base) var(--ease), border-color var(--base) var(--ease); }
+.tech:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--k) 35%, var(--hairline)); }
+.tech b { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+.tech b::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 3px; background: var(--k); }
+.tech p { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+.tech code { margin-top: auto; display: block; font: 12px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--ink);
+             background: var(--surface); border-radius: 8px; padding: 7px 9px; }
+
+.built { display: grid; gap: 0; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }
+.built > div { display: grid; grid-template-columns: 140px 1fr; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--hairline); }
+.built > div:first-child { border-top: 0; }
+.built span { font-size: 12.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding-top: 1px; }
+.built p { font-size: 14px; color: var(--ink-2); }
+
 .footer { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 24px 48px; }
 
 /* 10. Sheet + toast ------------------------------------------------------- */
@@ -505,9 +514,8 @@ body[data-view="results"] .examples, body[data-view="results"] .featured, body[d
   .results-grid { grid-template-columns: 1fr; }
   .map-col { position: static; order: -1; }
   .map { height: 300px; }
-  .methods { grid-template-columns: 1fr 1fr; }
-  .flow { grid-template-columns: repeat(3, 1fr); row-gap: 20px; }
-  .flow::before { display: none; }
+  .stage { grid-template-columns: 1fr; gap: 12px; }
+  .techs, .built { margin-left: 45px; }
 }
 @media (max-width: 640px) {
   main { padding: 0 16px; }
@@ -536,7 +544,7 @@ body[data-view="results"] .examples, body[data-view="results"] .featured, body[d
   /* A fade at the edge hints that there are more tabs to swipe to. */
   .tabs { mask-image: linear-gradient(90deg, #000 85%, transparent); -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); }
   .rail-btn { display: none; }
-  .methods, .trace-grid { grid-template-columns: 1fr; }
+  .trace-grid { grid-template-columns: 1fr; }
   .stat-strip { grid-template-columns: 1fr 1fr; }
   .stat-strip > div:nth-child(3) { border-left: 0; }
   .stat-strip > div:nth-child(n+3) { border-top: 1px solid var(--hairline); }

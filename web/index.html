@@ -196,110 +196,93 @@
     <section class="how" id="how">
       <div class="section-head reveal">
         <h2>How it works</h2>
-        <p class="muted">Started as my final project for Analytics for Unstructured Data (MSBA, UT Austin) and rebuilt since.
-          No single chatbot answer here: thirteen small agents each check one thing, plain math does the ranking,
-          and the LLMs are only allowed to interpret and explain.</p>
       </div>
 
       <div class="stat-strip reveal">
         <div><b>13</b><span>agents</span></div>
         <div><b>~25 s</b><span>per search, most steps in parallel</span></div>
         <div><b>~$0.006</b><span>LLM cost per search</span></div>
-        <div><b>43</b><span>offline tests, every API faked</span></div>
+        <div><b>43</b><span>automated tests, run offline against mocked APIs</span></div>
       </div>
 
-      <ol class="flow reveal" aria-label="The pipeline">
-        <li><span>1</span><b>Plan</b><small>LLM planner picks the agents</small></li>
-        <li><span>2</span><b>Search</b><small>Google Maps around you</small></li>
-        <li><span>3</span><b>Score</b><small>every place, with plain math</small></li>
-        <li><span>4</span><b>Check</b><small>fit, hours, live traffic</small></li>
-        <li><span>5</span><b>Evidence</b><small>reviews, websites, photos</small></li>
-        <li><span>6</span><b>Rank &amp; explain</b><small>weights, then a write-up</small></li>
+      <!-- Legend: each discipline appears once; methods below carry its color. -->
+      <ul class="legend reveal" aria-label="Methods by discipline">
+        <li><span class="dot-k k-stat"></span>Statistics</li>
+        <li><span class="dot-k k-nlp"></span>NLP &amp; embeddings</li>
+        <li><span class="dot-k k-rag"></span>Retrieval (RAG)</li>
+        <li><span class="dot-k k-vision"></span>Computer vision</li>
+        <li><span class="dot-k k-llm"></span>LLM engineering</li>
+        <li><span class="dot-k k-eng"></span>Software engineering</li>
+      </ul>
+
+      <!-- The pathway: what happens at each stage of a search, and the method behind it. -->
+      <ol class="pathway">
+        <li class="stage reveal">
+          <div class="stage-head"><span class="node">1</span><div><h3>Plan</h3><p>Read the request, decide which agents to run.</p></div></div>
+          <div class="techs">
+            <div class="tech k-llm"><b>Planner with a checked plan</b><p>The LLM proposes agents; Python enforces a dependency graph and a call budget.</p></div>
+            <div class="tech k-llm"><b>Request → structured JSON</b><p>Group size, budget, likes, dislikes, a time ("this afternoon") and map searches.</p></div>
+            <div class="tech k-eng"><b>Head start</b><p>Weather and events start in background threads right away.</p></div>
+          </div>
+        </li>
+        <li class="stage reveal">
+          <div class="stage-head"><span class="node">2</span><div><h3>Search</h3><p>Find real places around you.</p></div></div>
+          <div class="techs">
+            <div class="tech k-eng"><b>Boxed Google Maps searches</b><p>Several searches at once, limited to a box sized from your drive time.</p></div>
+            <div class="tech k-nlp"><b>Catalog ideas by meaning</b><p>For open-ended requests, outings from a 196-activity dataset ranked by embedding similarity.</p>
+              <code>0.70 semantic + 0.15 group + 0.10 budget + 0.05 category</code></div>
+            <div class="tech k-eng"><b>Polite retries</b><p>On "too many requests", wait 1, 2, 4, 8 s plus jitter.</p></div>
+          </div>
+        </li>
+        <li class="stage reveal">
+          <div class="stage-head"><span class="node">3</span><div><h3>Score</h3><p>Rank every place found, 50–75 of them, with plain math.</p></div></div>
+          <div class="techs">
+            <div class="tech k-nlp"><b>Fit by cosine similarity</b><p>all-MiniLM-L6-v2 embeddings of the request vs. each place.</p>
+              <code>sim(q,p) = q·p / (‖q‖‖p‖), rescaled to 0.3–1.0</code></div>
+            <div class="tech k-stat"><b>Bayesian-adjusted rating</b><p>A 5.0 from 12 reviews shouldn't beat a 4.7 from 3,000.</p>
+              <code>(v·r + m·C) / (v + m), m = 40, C = median ≤ 4.4</code></div>
+            <div class="tech k-stat"><b>Weighted pre-score + weather</b><p>Outdoor places are discounted when the forecast is bad.</p>
+              <code>0.45 fit + 0.25 quality + 0.20 near + 0.10 open</code></div>
+            <div class="tech k-eng"><b>Entity resolution</b><p>Duplicate listings and chain branches merged by name tokens, website and distance.</p></div>
+          </div>
+        </li>
+        <li class="stage reveal">
+          <div class="stage-head"><span class="node">4</span><div><h3>Check</h3><p>Look closer at the best dozen.</p></div></div>
+          <div class="techs">
+            <div class="tech k-llm"><b>LLM validator</b><p>Drops places that only sound related; batches of 4 checked in parallel.</p>
+              <code>keep if relevance ≥ 0.60, else check the next batch</code></div>
+            <div class="tech k-eng"><b>Live traffic + opening hours</b><p>Google Routes drive times; weekly hours turned into minute-of-week intervals.</p></div>
+          </div>
+        </li>
+        <li class="stage reveal">
+          <div class="stage-head"><span class="node">5</span><div><h3>Evidence</h3><p>Read and look at the finalists, both at the same time.</p></div></div>
+          <div class="techs">
+            <div class="tech k-rag"><b>Reviews + website RAG</b><p>Scrape, chunk, embed, retrieve; the LLM judges from those passages only.</p>
+              <code>700-char chunks, 120 overlap, coverage-aware top-k</code></div>
+            <div class="tech k-vision"><b>Photo vibe</b><p>A vision model rates the atmosphere in Google Maps photos when the look matters.</p>
+              <code>vibe ∈ [0, 1], 0.5 if unclear</code></div>
+          </div>
+        </li>
+        <li class="stage reveal">
+          <div class="stage-head"><span class="node">6</span><div><h3>Rank &amp; explain</h3><p>Pick three and say why.</p></div></div>
+          <div class="techs">
+            <div class="tech k-stat"><b>Re-normalized weights</b><p>A missing signal is dropped, never filled in with a guess.</p>
+              <code>Σ wᵢsᵢ / Σ wᵢ, w = 40 · 25 · 15 · 20 · 15</code></div>
+            <div class="tech k-eng"><b>Greedy diverse picks</b><p>No two of one business, a cap per kind of place.</p></div>
+            <div class="tech k-llm"><b>Grounded write-up</b><p>Must return the exact ranking or it's rejected.</p></div>
+          </div>
+        </li>
+        <li class="stage stage-end reveal">
+          <div class="stage-head"><span class="node end"></span><div><h3>Built with</h3><p>What makes it run.</p></div></div>
+          <div class="built">
+            <div><span>Data &amp; ML</span><p>Python · pandas · NumPy · sentence-transformers</p></div>
+            <div><span>LLM</span><p>Claude Haiku (text + vision)</p></div>
+            <div><span>Data sources</span><p>Google Places &amp; Routes · Open-Meteo · Ticketmaster · BeautifulSoup</p></div>
+            <div><span>Web</span><p>FastAPI (streaming) · vanilla JS · Leaflet</p></div>
+            <div><span>Quality</span><p>pytest, 43 offline tests · TTL cache · cost caps</p></div>
+          </div>
+        </li>
       </ol>
-
-      <div class="methods">
-        <article class="method reveal">
-          <p class="method-tag">Statistics</p>
-          <h3>Review-adjusted ratings</h3>
-          <p>A 5.0 from 12 reviews shouldn't beat a 4.7 from 3,000. Every rating is shrunk toward the typical
-            rating nearby with a Bayesian average, more strongly when there are few reviews.</p>
-          <code class="formula">adjusted = (v·r + m·C) / (v + m)<br><i>m = 40 prior reviews, C = median rating (capped at 4.4)</i></code>
-        </article>
-
-        <article class="method reveal">
-          <p class="method-tag">NLP</p>
-          <h3>Matching by meaning, not keywords</h3>
-          <p>The request and every place are turned into sentence embeddings (all-MiniLM-L6-v2) and compared
-            with cosine similarity, so "somewhere quiet to unwind" finds a tea house without sharing a word.</p>
-          <code class="formula">sim(q, p) = q·p / (‖q‖ ‖p‖)<br><i>min-max rescaled to 0.3–1.0 so it's comparable with the other scores</i></code>
-        </article>
-
-        <article class="method reveal">
-          <p class="method-tag">Statistics</p>
-          <h3>Scoring every place found</h3>
-          <p>All 50–75 places Google returns get a quick weighted score; outdoor places are discounted by
-            a rule-based weather suitability score from the forecast.</p>
-          <code class="formula">0.45 fit + 0.25 quality + 0.20 proximity + 0.10 open<br><i>× (1 − penalty<sub>env</sub> · (1 − weather)), penalty: outdoor 0.65, mixed 0.35</i></code>
-        </article>
-
-        <article class="method reveal">
-          <p class="method-tag">Statistics</p>
-          <h3>Missing data, handled honestly</h3>
-          <p>No drive time? No website? That signal is dropped and the remaining weights are re-normalized,
-            instead of quietly filling in a made-up 0.5.</p>
-          <code class="formula">score = Σ w<sub>i</sub>s<sub>i</sub> / Σ w<sub>i</sub>  over the signals that exist<br><i>w: fit 40, quality 25, travel 15, reviews 20, photo vibe 15</i></code>
-        </article>
-
-        <article class="method reveal">
-          <p class="method-tag">RAG</p>
-          <h3>Evidence from reviews and websites</h3>
-          <p>Each finalist's Google reviews and own website are scraped, cut into 700-character chunks
-            (120 overlap), embedded, and the closest chunks are retrieved. The LLM judges fit from those
-            passages only, never from its own memory.</p>
-          <code class="formula">coverage-aware top-k: best chunk per venue guaranteed, then up to 3 per venue</code>
-        </article>
-
-        <article class="method reveal">
-          <p class="method-tag">Computer vision</p>
-          <h3>Photo vibe</h3>
-          <p>For requests where the look matters ("cozy", "date night"), a vision model rates each finalist's
-            Google Maps photos for atmosphere. The planner skips it for "cheap tacos", since every photo costs money.</p>
-          <code class="formula">photo_vibe ∈ [0, 1], 0.5 when the photos are unclear</code>
-        </article>
-
-        <article class="method reveal">
-          <p class="method-tag">LLM engineering</p>
-          <h3>LLMs with guardrails</h3>
-          <p>The planner's plan is checked in Python against a dependency graph and a call budget. A validator
-            removes places that only sound related. The write-up must return the exact ranking or it's rejected.</p>
-          <code class="formula">plan → validate(deps, budget) · relevance ≥ 0.60 · order(write-up) == order(ranking)</code>
-        </article>
-
-        <article class="method reveal">
-          <p class="method-tag">Data cleaning</p>
-          <h3>One business, one result</h3>
-          <p>Google lists some venues twice and chains have branches everywhere. Listings are merged by name
-            tokens, website domain and haversine distance, then picked greedily with variety caps.</p>
-          <code class="formula">same if (domain match ∨ tokens(a) ⊆ tokens(b)) ∧ distance &lt; 0.1 mi</code>
-        </article>
-
-        <article class="method reveal">
-          <p class="method-tag">Engineering</p>
-          <h3>Fast, and cheap to run</h3>
-          <p>Independent agents run concurrently, LLM checks fan out one call per venue, and a time-limited cache
-            shares one request between simultaneous callers. Google calls back off with jitter on rate limits.</p>
-          <code class="formula">repeat search: ~6 s instead of ~20 (cache) · 429 → wait 1, 2, 4, 8 s (+ jitter)</code>
-        </article>
-      </div>
-
-      <div class="stack reveal">
-        <p class="stack-title">Built with</p>
-        <div class="stack-items">
-          <span>Python</span><span>pandas</span><span>NumPy</span><span>sentence-transformers</span><span>Claude Haiku</span>
-          <span>Google Places &amp; Routes</span><span>Open-Meteo</span><span>BeautifulSoup</span><span>FastAPI</span>
-          <span>Vanilla JS</span><span>Leaflet</span><span>pytest</span>
-        </div>
-      </div>
     </section>
   </main>
 
