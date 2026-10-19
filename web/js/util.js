@@ -60,16 +60,10 @@ export function toast(message, ms = 2600) {
 }
 
 // Swap views with the View Transitions API when the browser has it.
-// The update always runs: a background tab can hold a transition back indefinitely,
-// so after half a second it just happens without the animation.
+// Switch views. The new view's own entrance animations (cards sliding in) do the
+// motion; a whole-page cross-fade looked messy combined with scrolling.
 export function transition(update) {
-  const animate = document.startViewTransition && document.visibilityState === "visible"
-    && !matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!animate) { update(); return; }
-  let done = false;
-  const once = () => { if (!done) { done = true; update(); } };
-  document.startViewTransition(once);
-  setTimeout(once, 500);
+  update();
 }
 
 export const store = {

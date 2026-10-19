@@ -18,6 +18,7 @@ function skeletons(n = 5) {
 function placeCard(item, i) {
   const photo = item.photo_names?.[0];
   const meta = [stars(item.rating, item.review_count), price(item.price_level)].filter(Boolean).join(" · ");
+  const type = item.primary_type ? `<p class="card-type">${esc(item.primary_type)}</p>` : "";
   return `
     <a class="card" style="--i:${i}" href="${safeUrl(item.google_maps_uri)}" target="_blank" rel="noopener">
       <div class="card-media">
@@ -26,7 +27,7 @@ function placeCard(item, i) {
       </div>
       <div>
         <p class="card-name">${esc(item.place_name)}</p>
-        <p class="card-meta">${meta}${item.primary_type ? ` · ${esc(item.primary_type)}` : ""}</p>
+        <p class="card-meta">${meta}</p>${type}
       </div>
     </a>`;
 }

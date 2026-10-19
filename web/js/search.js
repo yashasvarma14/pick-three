@@ -388,6 +388,7 @@ export async function runSearch(body, { onDone }) {
     current = result;
     transition(() => {
       document.body.dataset.view = "results";
+      $("#progress").hidden = true;  // the results header already shows the time taken
       $("#results").hidden = false;
       renderHeader(result);
       renderPicks(result);
