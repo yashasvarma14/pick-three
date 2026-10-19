@@ -1,26 +1,51 @@
 // Entry point: wires the page together.
-// TODO (next session): search.js - progress checklist, result cards, map, feedback, trace.
 
 import { getConfig } from "./api.js";
 import { setupComposer } from "./composer.js";
 import { setupFeatured } from "./featured.js";
 import { setupMemory } from "./memory.js";
 import { frostedHeader, revealOnScroll, splitWords } from "./motion.js";
-import { $, toast } from "./util.js";
+import { goHome, runSearch, setupResults } from "./search.js";
+import { $, $$ } from "./util.js";
 
+// Entrance: headline words, then the subtitle and the search box.
 splitWords($("#hero-title"));
-$("#hero-sub").classList.add("fade-in");
-$("#hero-sub").style.setProperty("--d", "450ms");
-$("#composer").classList.add("fade-in");
-$("#composer").style.setProperty("--d", "560ms");
+[["#hero-sub", 450], ["#composer", 560]].forEach(([sel, delay]) => {
+  $(sel).classList.add("fade-in");
+  $(sel).style.setProperty("--d", `${delay}ms`);
+});
 frostedHeader($("#topbar"));
 revealOnScroll();
 setupMemory();
+setupResults();
 
-setupComposer({
-  onSubmit: () => toast("Search results view is still being built (see docs/NEXT_STEPS.md)."),
+const status = $("#status-line");
+const composer = setupComposer({
+  onSubmit: async (body) => {
+    status.textContent = "";
+    status.classList.remove("error");
+    composer.setBusy(true);
+    try {
+      await runSearch(body, { onDone: () => composer.setBusy(false) });
+    } catch (err) {
+      status.textContent = err.message;
+      status.classList.add("error");
+    }
+  },
 });
 
+$$("[data-action='home']").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); goHome(); }));
+$$("[data-action='how']").forEach((el) => el.addEventListener("click", (e) => {
+  if (document.body.dataset.view === "results") { e.preventDefault(); goHome(); setTimeout(() => $("#how").scrollIntoView({ behavior: "smooth" }), 350); }
+}));
+
 getConfig()
-  .then((cfg) => setupFeatured(cfg.categories))
-  .catch(() => { $("#featured").hidden = true; });
+  .then((cfg) => {
+    setupFeatured(cfg.categories);
+    if (!cfg.ready) { status.textContent = "The site owner still needs to add API keys before searches work."; }
+  })
+  .catch(() => {
+    $("#featured").hidden = true;
+    status.textContent = "Can't reach the server right now.";
+    status.classList.add("error");
+  });
