@@ -62,14 +62,16 @@ The whole search is one function, `run_pipeline()` in [`recommender/pipeline.py`
 ## Run it locally
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/activity-recommender.git
-cd activity-recommender
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+git clone https://github.com/YOUR-USERNAME/pick-three.git
+cd pick-three
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scriptsctivate
 pip install -r requirements.txt
 
 cp .streamlit/secrets.toml.example .streamlit/secrets.toml   # then add your keys
-streamlit run app.py
+uvicorn api.main:app --port 8000                             # open http://localhost:8000
 ```
+
+The original Streamlit version still works: `pip install -r requirements-streamlit.txt`, then `streamlit run app.py`.
 
 The activity catalog lives in `data/activities_catalog.csv` (196 rows). To rebuild it from the raw Kaggle file:
 
@@ -87,19 +89,32 @@ python scripts/build_catalog.py path/to/activity.json
 
 Weather uses Open-Meteo, which needs no key. The Photo Vibe agent uses the same Google key (Places API (New) photos) and needs a vision-capable `LLM_MODEL` (every current Claude model is); set `photo_vibe` to `"off"` in `recommender/config.py` to turn it off.
 
-## Deploy your own copy (Streamlit Community Cloud)
+## Deploy (Hugging Face Spaces, free)
 
-1. Push this repo to GitHub (public).
-2. Go to [share.streamlit.io](https://share.streamlit.io), sign in with GitHub, and choose **Create app**.
-3. Pick the repo, branch `main`, and main file `app.py`. Under **Advanced settings**, choose Python 3.12 and paste the contents of your `secrets.toml` into **Secrets**.
-4. Pick a custom subdomain, then **Deploy**. The first build takes a few minutes while PyTorch and the embedding model install.
+The `Dockerfile` runs the API and the website together in one container. Hugging Face builds it.
+
+1. Create a free account at huggingface.co and a token with **write** access (Settings → Access Tokens).
+2. Log in once: `hf auth login`
+3. Deploy (re-run to push updates):
+   ```bash
+   python scripts/deploy_hf.py --space YOUR-HF-USERNAME/pick-three --with-secrets
+   ```
+   `--with-secrets` copies the keys from `.streamlit/secrets.toml` into the Space's encrypted secrets;
+   the file itself is never uploaded. Without it, add them under Space → Settings → Variables and secrets.
+4. The first build takes 5–10 minutes. The site is then at `https://YOUR-HF-USERNAME-pick-three.hf.space`.
+
+Free Spaces sleep after a while without visitors, so nothing runs (or costs anything) when nobody is using it.
+The first visit after a nap takes about a minute to wake up.
 
 ### Keeping a public demo affordable
 
-Every search calls paid APIs, so the app limits searches per visitor (`RUNS_PER_SESSION`) and per day (`RUNS_PER_DAY`). Also set limits on the provider side:
+Every search calls paid APIs, so the site allows 3 searches per visitor per day and 10 in total
+(`RUNS_PER_VISITOR_PER_DAY`, `RUNS_PER_DAY`). The home page's top-10 lists come from a snapshot
+(`python scripts/build_featured.py`, about once a month), so page views make no Google searches.
+Google's free monthly allowance covers roughly the first 60–100 searches. Also set limits on the provider side:
 
 - **Anthropic:** set a monthly spend limit in the Claude Console's billing / limits settings.
-- **Google Cloud:** restrict the key to Places API (New) and Routes API, and set per-day request quotas for each. Each photo the Photo Vibe agent downloads is a billed Place Photo request (up to 3 photos x 5 venues per search, only when the planner thinks the look matters).
+- **Google Cloud:** restrict the key to Places API (New) and Routes API, and set per-day request quotas for each. Each photo the Photo Vibe agent downloads is a billed Place Photo request (up to 2 photos x 5 venues per search, only when the planner thinks the look matters). Add a $1 budget alert.
 
 Visitor memory is kept in the browser session only, so visitors never see or change each other's preferences.
 

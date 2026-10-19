@@ -1,0 +1,4 @@
+# The original Streamlit version (app.py): streamlit run app.py
+-r requirements.txt
+streamlit>=1.50
+streamlit-js-eval==1.0.0
