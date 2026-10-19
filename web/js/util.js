@@ -60,12 +60,16 @@ export function toast(message, ms = 2600) {
 }
 
 // Swap views with the View Transitions API when the browser has it.
+// The update always runs: a background tab can hold a transition back indefinitely,
+// so after half a second it just happens without the animation.
 export function transition(update) {
-  if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    document.startViewTransition(update);
-  } else {
-    update();
-  }
+  const animate = document.startViewTransition && document.visibilityState === "visible"
+    && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!animate) { update(); return; }
+  let done = false;
+  const once = () => { if (!done) { done = true; update(); } };
+  document.startViewTransition(once);
+  setTimeout(once, 500);
 }
 
 export const store = {

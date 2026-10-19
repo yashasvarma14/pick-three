@@ -239,10 +239,10 @@ button { transition: transform var(--fast) var(--ease), background-color var(--b
 /* 7. Results -------------------------------------------------------------- */
 .results { padding: 8px 0 40px; }
 .results-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 14px; }
-.results-kicker { font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
-.results-title { font-size: clamp(22px, 3vw, 30px); line-height: 1.2; max-width: 32ch; font-weight: 600; }
-.results-title.pending { color: var(--muted); }
-.results-title .shimmer-text { background: linear-gradient(90deg, var(--muted) 0%, #c9c9cc 50%, var(--muted) 100%);
+.results-kicker { font-size: 12.5px; color: var(--accent); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 8px; }
+.results-title { font-size: clamp(26px, 3.4vw, 36px); line-height: 1.15; font-weight: 600; }
+.results-summary { margin-top: 10px; max-width: 68ch; color: var(--ink-2); font-size: 16.5px; line-height: 1.6; }
+.results-summary .shimmer-text { background: linear-gradient(90deg, var(--muted) 0%, #c9c9cc 50%, var(--muted) 100%);
   background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.6s linear infinite; }
 .notes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
 .note { font-size: 13px; color: var(--ink-2); background: var(--surface); border-radius: 999px; padding: 6px 12px; }
@@ -344,14 +344,15 @@ button { transition: transform var(--fast) var(--ease), background-color var(--b
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
 .stat { background: var(--surface); border-radius: var(--radius-sm); padding: 12px 14px; }
 .stat b { display: block; font-size: 20px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.stat span { font-size: 12.5px; color: var(--muted); }
+.stat > span { font-size: 12.5px; color: var(--muted); }
 .timing { display: grid; grid-template-columns: 150px 1fr 48px; gap: 8px; align-items: center; font-size: 13px; padding: 3px 0; }
 .timing .bar-fill { transform: scaleX(var(--v)); }
 
 /* Map pins */
 .pin { width: 12px; height: 12px; border-radius: 50%; background: #b8b8b4; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25);
        transition: transform var(--base) var(--ease), background-color var(--base) var(--ease); }
-.pin.pick { width: 28px; height: 28px; background: var(--accent); color: #fff; display: grid; place-items: center; font: 700 13px var(--font); }
+.pin.pick { width: 28px; height: 28px; background: var(--accent); color: #fff; display: grid; place-items: center;
+            font: 700 13px/1 var(--font); }
 .pin.you { background: #2b6cff; width: 16px; height: 16px; box-shadow: 0 0 0 6px rgba(43, 108, 255, .18); }
 .pin.linked { transform: scale(1.35); background: var(--ink); z-index: 1000; }
 .leaflet-container { font-family: var(--font); }

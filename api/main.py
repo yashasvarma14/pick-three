@@ -267,6 +267,15 @@ def post_feedback(body: FeedbackBody):
     return {"memory": clean(updated), "summary": response["data"].get("feedback_summary")}
 
 
+@app.middleware("http")
+async def revalidate_site_files(request: Request, call_next):
+    """Make browsers check for a newer index.html / CSS / JS on each load (cheap: 304 if unchanged)."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 # The website itself (for local runs and single-server hosting).
 if WEB_DIR.exists():
     app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")

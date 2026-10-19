@@ -153,16 +153,16 @@ function renderHeader(result) {
   const placesChecked = result.places.length;
   $("#results-kicker").textContent =
     `${result.picks.length} picks · ${placesChecked} places checked · ${result.runtime_seconds}s`;
-  const title = $("#results-title");
+  $("#results-title").textContent = result.ok ? "Your three picks" : "Nothing made it through this time.";
+  const summary = $("#results-summary");
   if (result.write_up?.overall_summary) {
-    title.classList.remove("pending");
-    title.textContent = result.write_up.overall_summary;
+    summary.classList.remove("pending");
+    summary.textContent = result.write_up.overall_summary;
   } else if (result.ok) {
-    title.classList.add("pending");
-    title.innerHTML = `<span class="shimmer-text">Here are your picks. Writing up why each one fits…</span>`;
+    summary.classList.add("pending");
+    summary.innerHTML = `<span class="shimmer-text">Writing up why each one fits…</span>`;
   } else {
-    title.classList.remove("pending");
-    title.textContent = "Nothing made it through this time.";
+    summary.textContent = "";
   }
 
   const notes = [];
@@ -256,9 +256,12 @@ function renderMap(result) {
   if (!window.L) { $("#map").innerHTML = `<p class="empty" style="padding:20px">Map unavailable.</p>`; return; }
   if (!map) {
     map = L.map("map", { zoomControl: true, scrollWheelZoom: false, attributionControl: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19, subdomains: "abcd",
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    // Esri's light gray basemap: free, no key, and quiet enough to let the pins stand out.
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 16, attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors",
+    }).addTo(map);
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 16,
     }).addTo(map);
   }
   markers.forEach((m) => m.remove());
@@ -284,11 +287,11 @@ function renderMap(result) {
     bounds.push([result.center.latitude, result.center.longitude]);
   }
   // The map's box only has its real size once the results are visible.
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     map.invalidateSize();
     if (bounds.length > 1) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
     else if (bounds.length) map.setView(bounds[0], 13);
-  });
+  }, 0);
 }
 
 // Hovering a card or list row lights up its pin (and the other way round).
@@ -330,8 +333,8 @@ async function loadWriteup(result) {
       }
     });
   } catch {
-    $("#results-title").classList.remove("pending");
-    $("#results-title").textContent = "Here are your picks.";
+    $("#results-summary").classList.remove("pending");
+    $("#results-summary").textContent = "";
     $$(".pick-why.pending").forEach((el) => el.remove());
   }
 }
@@ -391,11 +394,12 @@ export async function runSearch(body, { onDone }) {
       renderList(result);
       renderEvents(result);
       renderTrace(result);
+      // The map needs its box on screen to size itself, so draw it once the results are visible.
+      setTimeout(() => {
+        renderMap(result);
+        $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 60);
     });
-    setTimeout(() => {
-      renderMap(result);
-      $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 60);
     if (result.ok) loadWriteup(result);
   } catch (err) {
     progress.fail();
