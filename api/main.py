@@ -76,8 +76,8 @@ RECENT_RUNS = OrderedDict()  # run_id -> state, so /api/writeup can finish a sea
 MAX_RECENT_RUNS = 100
 
 # Hard caps so a public portfolio demo can't run up a bill.
-RUNS_PER_VISITOR = int(config.get_setting("RUNS_PER_VISITOR_PER_DAY", 5))
-RUNS_PER_DAY = int(config.get_setting("RUNS_PER_DAY", 30))
+RUNS_PER_VISITOR = int(config.get_setting("RUNS_PER_VISITOR_PER_DAY", 3))
+RUNS_PER_DAY = int(config.get_setting("RUNS_PER_DAY", 10))
 _usage = {"date": date.today(), "total": 0, "by_visitor": {}}
 _usage_lock = threading.Lock()
 

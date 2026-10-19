@@ -2,19 +2,18 @@
 
 Branch: `feature/web-frontend`
 
-Done
-- `api/` FastAPI backend: search (streams progress), write-up, feedback, Austin top-10 lists, photo proxy.
-  Run: `.venv/Scripts/python -m uvicorn api.main:app --reload --port 8000`, then open http://localhost:8000
-- `web/index.html`, `web/css/styles.css`
-- `web/js/`: util, api, motion, composer, featured, memory, main (home page works: hero, composer, top-10 rail, memory panel)
-- Design rules: `docs/design.md`
+Run it: `.venv/Scripts/python -m uvicorn api.main:app --port 8000`, then open http://localhost:8000
 
-In progress / to do
-- `web/js/search.js` (not written yet): call `search()` from api.js, show the progress checklist (#progress, #steps,
-  STEP_LABELS in util.js), switch `body[data-view]` to "results", render picks (#picks, .pick cards with photos via
-  photoUrl), Leaflet map (#map, CARTO light tiles), all-places list, events, trace, then call `getWriteup(run_id)`
-  and fill in the write-up; feedback form -> `sendFeedback` -> `memory.set(...)`. Hook it up in main.js onSubmit.
-- Not yet tested in a browser at all.
-- API tests (tests/test_api.py)
-- Deployment: Dockerfile for Hugging Face Spaces (backend), Vercel/Netlify for web/
-- Remove the old Streamlit `app.py` + `ui/` once the website matches it
+Done and tested in the browser
+- `api/` FastAPI backend: search (streams progress), write-up, feedback -> memory, top-10 lists, photo proxy,
+  daily caps (3 searches per visitor, 10 total by default; RUNS_PER_VISITOR_PER_DAY / RUNS_PER_DAY to change)
+- `web/`: home page (hero, search box with where/when/drive, Austin top 10 from a snapshot, how it works),
+  live progress checklist, results (3 picks with photos, map, all places, events, agent trace, feedback)
+- Top-10 lists come from `web/data/featured.json`; refresh monthly with `python scripts/build_featured.py`
+
+To do
+- API tests (tests/test_api.py) with the fakes in tests/fakes.py
+- Deployment: Dockerfile for Hugging Face Spaces (backend + site together is simplest)
+- Google Cloud: per-day quota caps on Places + Routes, and a $1 budget alert
+- Remove the old Streamlit `app.py` + `ui/` once happy with the website; update README
+- Visual polish pass on phone sizes
