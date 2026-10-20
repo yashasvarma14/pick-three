@@ -79,7 +79,7 @@ to follow the code is to read `pipeline.py` top to bottom and open each agent as
 ## Run it locally
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/pick-three.git
+git clone https://github.com/yashasvarma14/pick-three.git
 cd pick-three
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -165,4 +165,4 @@ Dockerfile                  the Cloud Run container
 
 ## Author
 
-Built by Yashas Varma.
+Built by Yashas Varma. The website's design and front end were made with Claude (Anthropic).
