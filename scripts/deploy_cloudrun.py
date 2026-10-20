@@ -114,6 +114,9 @@ def main():
         run(["run", "deploy", SERVICE, "--source", ".", "--region", args.region,
              "--memory", "2Gi", "--cpu", "1", "--timeout", "300",
              "--min-instances", "0", "--max-instances", "1", "--concurrency", "10",
+             # Extra CPU only while the container starts (loading PyTorch + the embedding
+             # model), so the first visit after an idle spell wakes up faster.
+             "--cpu-boost",
              "--env-vars-file", env_file,
              "--allow-unauthenticated" if args.public else "--no-allow-unauthenticated",
              "--quiet"])
