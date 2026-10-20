@@ -38,7 +38,13 @@ def test_config_lists_top10_categories(client):
     assert {"restaurants", "coffee"} <= {c["id"] for c in cfg["categories"]}
 
 
-def test_top10_comes_from_the_snapshot(client):
+def test_top10_comes_from_the_snapshot(client, monkeypatch, tmp_path):
+    # The real snapshot isn't committed (Google's terms), so the test makes its own.
+    snapshot = tmp_path / "featured.json"
+    items = [{"rank": i, "place_name": f"Place {i}"} for i in range(1, 11)]
+    snapshot.write_text(json.dumps({"generated": "2026-10-19", "lists": {"restaurants": {"label": "Restaurants",
+                                                                                         "items": items}}}))
+    monkeypatch.setattr("api.featured.SNAPSHOT", snapshot)
     data = client.get("/api/featured/restaurants").json()
     assert len(data["items"]) == 10 and data["items"][0]["rank"] == 1
     assert client.get("/api/featured/nope").status_code == 404
