@@ -4,8 +4,9 @@
 fun and social tonight, not too expensive"*, and thirteen small AI agents check real places, live traffic,
 reviews and photos, then pick three, with a written explanation of why each one fits.
 
-<!-- Screenshot: save one as docs/screenshot.png and remove the comment markers around the next line -->
-<!-- ![Pick Three](docs/screenshot.png) -->
+**[Try it live →](https://pick-three-922459864103.us-central1.run.app)** &nbsp;·&nbsp; 3 free searches per visitor per day
+
+![Pick Three results: three picks with photos, a write-up and a map](docs/screenshot-results.jpg)
 
 Not a single chatbot guess: an LLM planner decides which specialists a request needs, plain math does
 the ranking, and the LLMs are only allowed to interpret and explain. The site shows its work: every agent
@@ -27,6 +28,10 @@ UT Austin) and rebuilt since as a personal project.
 | **Entity resolution** | Duplicate listings and chain branches merged by name tokens, website domain and haversine distance |
 | **Fast and cheap** | Independent agents run concurrently; LLM checks fan out one call per venue; a single-flight TTL cache; ~25 s and ~$0.006 of LLM per search |
 | **Tested** | 50 offline tests with every API mocked |
+
+| Home page | Austin's top 10, before you search |
+|---|---|
+| ![Home page](docs/screenshot-home.jpg) | ![Austin's top 10](docs/screenshot-top10.jpg) |
 
 ## How it works
 
@@ -116,7 +121,7 @@ scales to zero when nobody is using it, and its free tier covers thousands of se
 
 ### Keeping a public demo affordable
 
-The site allows 3 searches per visitor per day and 10 in total (`RUNS_PER_VISITOR_PER_DAY`, `RUNS_PER_DAY`);
+The live site allows 3 searches per visitor per day and 10 in total (`RUNS_PER_VISITOR_PER_DAY`, `RUNS_PER_DAY`);
 visitors are identified by the proxy-added address, so a faked header can't reset the limit. The top-10
 lists come from a snapshot (`scripts/build_featured.py`, about once a month; it isn't committed because
 Google's terms limit storing place data), so page views make no Google searches. Also set provider limits:

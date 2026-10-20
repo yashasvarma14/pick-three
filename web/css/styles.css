@@ -352,7 +352,8 @@ button { transition: transform var(--fast) var(--ease), background-color var(--b
 /* Map pins */
 .pin { width: 12px; height: 12px; border-radius: 50%; background: #b8b8b4; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25);
        transition: transform var(--base) var(--ease), background-color var(--base) var(--ease); }
-.pin.pick { width: 28px; height: 28px; background: var(--accent); color: #fff; display: grid; place-items: center;
+.pin.top {  /* not ".pick": that class is the result card */
+ width: 28px; height: 28px; background: var(--accent); color: #fff; display: grid; place-items: center;
             font: 700 13px/1 var(--font); }
 .pin.you { background: #2b6cff; width: 16px; height: 16px; box-shadow: 0 0 0 6px rgba(43, 108, 255, .18); }
 .pin.linked { transform: scale(1.35); background: var(--ink); z-index: 1000; }

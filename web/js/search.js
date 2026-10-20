@@ -249,7 +249,7 @@ function renderTrace(result) {
 
 function pinIcon(kind, label = "") {
   return L.divIcon({ className: "", html: `<div class="pin ${kind}">${label}</div>`,
-    iconSize: kind === "pick" ? [28, 28] : kind === "you" ? [16, 16] : [12, 12] });
+    iconSize: kind === "top" ? [28, 28] : kind === "you" ? [16, 16] : [12, 12] });
 }
 
 function renderMap(result) {
@@ -276,7 +276,7 @@ function renderMap(result) {
   });
   result.picks.forEach((p, i) => {
     if (p.latitude == null) return;
-    const m = L.marker([p.latitude, p.longitude], { icon: pinIcon("pick", i + 1), zIndexOffset: 1000 }).addTo(map)
+    const m = L.marker([p.latitude, p.longitude], { icon: pinIcon("top", i + 1), zIndexOffset: 1000 }).addTo(map)
       .bindPopup(`<strong>${i + 1}. ${esc(p.place_name)}</strong><br>${esc(p.primary_type || "")}`);
     m.on("click", () => document.querySelector(`.pick[data-id="${CSS.escape(p.place_id)}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
     markers.set(p.place_id, m);
