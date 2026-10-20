@@ -1,7 +1,6 @@
-# The website (FastAPI) and the recommender. CPU-only PyTorch keeps the image small.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch
-sentence-transformers>=3.0
+# The website (FastAPI) and the recommender.
+# Embeddings run on fastembed (ONNX Runtime), not PyTorch: same model, much faster start-up.
+fastembed>=0.7
 anthropic>=1.15
 fastapi>=0.115
 uvicorn[standard]>=0.30

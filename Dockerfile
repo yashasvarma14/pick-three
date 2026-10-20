@@ -2,10 +2,10 @@
 # One container serves both the API and the website, on the port Cloud Run gives it ($PORT).
 FROM python:3.12-slim
 
-# HF_HOME is where the embedding model gets stored inside the image.
+# FASTEMBED_CACHE_PATH is where the embedding model gets stored inside the image.
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/home/user/.cache/huggingface
+    FASTEMBED_CACHE_PATH=/home/user/.cache/fastembed
 
 # Run as a regular user, not root.
 RUN useradd -m -u 1000 user
@@ -16,7 +16,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 USER user
 # Bake the embedding model into the image so the first visitor doesn't wait for a download.
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding('sentence-transformers/all-MiniLM-L6-v2', cache_dir='/home/user/.cache/fastembed')"
 
 COPY --chown=user . .
 

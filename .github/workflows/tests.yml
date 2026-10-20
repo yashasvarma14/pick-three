@@ -8,6 +8,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # The tests fake the embedding model, so PyTorch isn't needed here.
+      # The tests fake the embedding model, so fastembed isn't needed here.
       - run: pip install pandas numpy requests beautifulsoup4 anthropic fastapi httpx pytest
       - run: python -m pytest -q

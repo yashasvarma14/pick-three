@@ -8,6 +8,7 @@ at home ("Take a nap"), so OUTING_QUERIES below lists the ones that are
 real outings and what to type into Google Maps for each.
 """
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -147,20 +148,24 @@ def outing_query(activity):
 
 
 class SentenceEmbedder:
-    """Thin wrapper so the rest of the code only needs `.encode(list_of_text)`."""
+    """
+    Thin wrapper so the rest of the code only needs `.encode(list_of_text)`.
+
+    Runs all-MiniLM-L6-v2 with fastembed (ONNX Runtime) instead of PyTorch: the
+    same model and the same vectors, but it loads in a few seconds and keeps the
+    server image small, so a sleeping Cloud Run instance wakes up much faster.
+    """
 
     def __init__(self, model_name=EMBEDDING_MODEL_NAME):
-        from sentence_transformers import SentenceTransformer
+        from fastembed import TextEmbedding
 
-        self.model = SentenceTransformer(model_name, device="cpu")
+        # FASTEMBED_CACHE_PATH is set in the Dockerfile, where the model is baked in.
+        self.model = TextEmbedding(model_name, cache_dir=os.environ.get("FASTEMBED_CACHE_PATH"))
 
     def encode(self, texts):
-        return self.model.encode(
-            list(texts),
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        )
+        vectors = np.array(list(self.model.embed(list(texts))), dtype=np.float32)
+        # Unit length, so a dot product is the cosine similarity.
+        return vectors / np.clip(np.linalg.norm(vectors, axis=1, keepdims=True), 1e-12, None)
 
 
 class Resources:

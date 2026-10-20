@@ -20,7 +20,7 @@ UT Austin) and rebuilt since as a personal project.
 | | |
 |---|---|
 | **Review-adjusted ratings** | Bayesian average, `(v·r + m·C) / (v + m)` with m = 40, so a 5.0 from 12 reviews doesn't beat a 4.7 from 3,000 |
-| **Semantic matching** | `all-MiniLM-L6-v2` sentence embeddings and cosine similarity match the request to places by meaning, not keywords |
+| **Semantic matching** | `all-MiniLM-L6-v2` sentence embeddings (run with fastembed on ONNX Runtime, no PyTorch) and cosine similarity match the request to places by meaning, not keywords |
 | **Honest missing data** | When a signal is missing (no drive time, no website, no photos) it's dropped and the weights re-normalized, never filled with a guess |
 | **Retrieval-augmented evidence** | Reviews and venue websites are chunked (700 chars, 120 overlap), embedded and retrieved; the LLM judges fit from those passages only |
 | **Vision** | For requests where the look matters, a vision model rates the atmosphere in Google Maps photos |
