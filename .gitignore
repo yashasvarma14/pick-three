@@ -13,3 +13,8 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+
+# Kept local, not published
+notebooks/
+# Google Places data: Google's terms limit storing it, so it is rebuilt with scripts/build_featured.py
+web/data/featured.json
