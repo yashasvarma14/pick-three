@@ -4,7 +4,7 @@
 fun and social tonight, not too expensive"*, and thirteen small AI agents check real places, live traffic,
 reviews and photos, then pick three, with a written explanation of why each one fits.
 
-**[Try it live →](https://pick-three-922459864103.us-central1.run.app)** &nbsp;·&nbsp; 3 free searches per visitor per day
+**[Try it live →](https://pick-three-922459864103.us-central1.run.app)** &nbsp;·&nbsp; 
 
 ![Pick Three results: three picks with photos, a write-up and a map](docs/screenshot-results.jpg)
 
